@@ -16,47 +16,14 @@ from sebas_bootstrap import load_env
 
 load_env()  # Must run before anything imports openjarvis.
 
+from sebas_brain import Brain  # noqa: E402  (Claude, or a local model offline)
+
 logger = logging.getLogger("sebas")
 
-_MAX_HISTORY_MESSAGES = 20
 _FAILURE_REPLY = (
     "I regret to report that the request could not be completed. "
     "The details are in the console, should you wish to review them."
 )
-
-
-class Brain:
-    """Sends requests to the orchestrator and remembers the conversation."""
-
-    def __init__(self) -> None:
-        from openjarvis.system.builder import SystemBuilder
-
-        import custom_tools  # noqa: F401  (registers Sebas's tools)
-
-        self._system = SystemBuilder().agent("orchestrator").build()
-        self._history: list = []
-
-    def ask(self, text: str) -> str:
-        from openjarvis.core.types import Message, Role
-
-        # The agent is named explicitly: otherwise OpenJarvis diverts anything
-        # containing "good morning" to its separate morning_digest agent.
-        result = self._system.ask(
-            text, agent="orchestrator", prior_messages=self._history
-        )
-        reply = result["content"]
-        if result.get("error"):
-            raise RuntimeError(reply)
-        if reply:
-            self._history += [
-                Message(role=Role.USER, content=text),
-                Message(role=Role.ASSISTANT, content=reply),
-            ]
-            del self._history[:-_MAX_HISTORY_MESSAGES]
-        return reply
-
-    def close(self) -> None:
-        self._system.close()
 
 
 _SUMMON_REPLY = "At your service."
@@ -177,11 +144,13 @@ def main() -> int:
     if args.mic_test:
         mic_test()
         return 0
-    if not os.environ.get("ANTHROPIC_API_KEY"):
-        print("ANTHROPIC_API_KEY is not set. Copy .env.template to .env and fill it in.")
+    try:
+        brain = Brain()
+    except RuntimeError as exc:
+        print(f"Sebas cannot start: {exc}")
+        print("Add ANTHROPIC_API_KEY to .env, or install a local model with Ollama.")
         return 1
-
-    brain = Brain()
+    print(f"Thinking with {brain.description}.", flush=True)
     try:
         run_text(brain) if args.text else run_voice(brain)
     except (KeyboardInterrupt, EOFError):

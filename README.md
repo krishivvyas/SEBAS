@@ -10,7 +10,7 @@
 
 **SEBAS** is a voice assistant in the manner of a British butler: unfailingly polite, hyper-competent, concise, and fiercely loyal. Call him by name, *"Sebas, rise"*, and he handles your deployments, pull requests, schedule and laptop.
 
-Built on the **OpenJarvis** agent framework, with **Anthropic Claude** as the reasoning engine. Listening and speaking run entirely on your own machine.
+Built on the **OpenJarvis** agent framework, with **Anthropic Claude** as the reasoning engine and a **local Ollama model** as the fallback when there is no API key or no internet. Listening and speaking always run on your own machine.
 
 ---
 
@@ -29,6 +29,7 @@ flowchart TD
         STT --> Brain["OpenJarvis Orchestrator\n20-message history + MEMORY.md"]
         STT2 --> Brain
         Brain <--> Claude["Anthropic Claude\n(claude-opus-5-5)"]
+        Brain <-. "no key / offline" .-> Local["Local model via Ollama\n(best installed, auto-picked)"]
         Brain <--> Tools["custom_tools/\n• Vercel & AWS (read-only)\n• GitHub\n• Steam & Bookswagon\n• Morning briefing + Google Calendar\n• Laptop actions (allowlist)"]
     end
 
@@ -62,6 +63,7 @@ flowchart TD
   | Daily | `morning_briefing` (time, weather, Google Calendar), `get_weather` | Read-only |
   | Laptop | `open_app`, `open_website`, `open_workspace`, `run_shortcut`, `system_status`, `set_volume`, `lock_screen`, `set_reminder`, `list_reminders` | Only what `laptop.toml` allows |
   | Memory | `remember`, `forget` | Writes only `MEMORY.md` |
+- **Works offline**: with no `ANTHROPIC_API_KEY`, or when Claude can't be reached, Sebas picks the best tool-capable model from `ollama list` and carries on. If the connection drops mid-session he says so, switches, and checks every 5 minutes whether Claude is back.
 - **Modes**: voice, text (`--text`) and microphone calibration (`--mic-test`).
 
 ---
@@ -74,6 +76,7 @@ sebas/
 ├── run.bat                          # One-click Windows launcher
 └── sebas_main/                      # OpenJarvis framework + Sebas
     ├── run_sebas.py                 # Main loop: voice and text modes
+    ├── sebas_brain.py               # Claude, or a local Ollama model offline
     ├── sebas_bootstrap.py           # Loads .env; one-request API check
     ├── requirements_voice.txt       # Voice pipeline packages
     ├── requirements_tools.txt       # Tool packages (boto3, pycaw)
@@ -104,7 +107,7 @@ sebas/
 - **Windows 10/11** (the laptop tools and `run.bat` are Windows-specific)
 - **Python 3.12** and [**uv**](https://docs.astral.sh/uv/)
 - A microphone and speakers
-- An [Anthropic API key](https://console.anthropic.com/)
+- An [Anthropic API key](https://console.anthropic.com/), and/or [Ollama](https://ollama.com/) with a tool-capable model for offline use
 
 ### Installation
 
@@ -127,11 +130,12 @@ The speech models (about 0.5 GB in total) download automatically on first run.
 Copy-Item .env.template .env
 ```
 
-Then fill in `.env`. Only `ANTHROPIC_API_KEY` is required; each tool tells you which key it is missing when you first use it.
+Then fill in `.env`. Nothing is strictly required: without `ANTHROPIC_API_KEY` Sebas runs on a local model, and each tool tells you which key it is missing when you first use it.
 
 | Setting | Used by | Notes |
 |---|---|---|
-| `ANTHROPIC_API_KEY` | Everything | Required |
+| `ANTHROPIC_API_KEY` | Reasoning | Claude; without it Sebas uses a local model |
+| `SEBAS_LOCAL_MODEL` | Offline reasoning | Force a model from `ollama list` instead of the automatic choice |
 | `VERCEL_TOKEN`, `VERCEL_TEAM_ID` | Vercel deployments | Team ID only for team projects |
 | `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, `AWS_DEFAULT_REGION` | EC2 health | Read-only IAM credentials suffice |
 | `GITHUB_PAT` | GitHub | Classic token with `repo` and `notifications` scopes; fine-grained tokens cannot read notifications |
@@ -178,6 +182,28 @@ Then fill in `.env`. Only `ANTHROPIC_API_KEY` is required; each tool tells you w
 
 ---
 
+## 🧠 Offline Mode (Local Models)
+
+When `ANTHROPIC_API_KEY` is missing, or `api.anthropic.com` can't be reached, Sebas starts the Ollama server if needed and picks the first installed model from this ranking (`LOCAL_MODEL_PREFERENCE` in `sebas_brain.py`): `qwen2.5` → `llama3.1:8b` → `llama3.2`. If none of those is installed he uses the largest model that supports tool calling. `SEBAS_LOCAL_MODEL` in `.env` overrides the choice.
+
+The ranking comes from a benchmark of Sebas's own requests (laptop status, a reminder, opening a site, remembering a fact, small talk) through his real persona and tools, on an i7-1360P laptop with 16 GB RAM and no GPU:
+
+| Model | Correct tool use | Typical reply | Notes |
+|---|---|---|---|
+| **qwen2.5 (7.6B)** | **5 / 5** | **5–25 s** | Chosen: accurate and fastest of the capable models |
+| llama3.1:8b | 4 / 5 | ~2 min | Ran the morning briefing in reply to "how are you?" |
+| llama3.2 (3.2B) | 3 / 5 | ~1 min | Picked the wrong tools for memory and small talk |
+| qwen3.5 (9.7B) | 1 / 1 | ~5 min | Too slow on this hardware |
+| mistral (7.2B) | 1 / 5 | varies | Never called tools; invented data |
+| qwen2.5-coder:1.5b | 1 / 5 | ~1 s | Wrote tool calls as text instead of running them |
+
+What to expect offline:
+- **Startup**: the model is preloaded in the background, which takes about 2½ minutes on CPU. A request made during that time waits for it.
+- **Replies**: about 25 s for the first, 10–15 s after that, compared with a few seconds on Claude. Answers are also less precise; in testing, `qwen2.5` once misread a memory figure from the status tool.
+- **Memory**: the model needs about 5 GB of RAM on top of Sebas's voice models (about 2 GB). With little free memory Windows swaps to disk, and replies slow to minutes. Closing heavy apps helps, or set `SEBAS_LOCAL_MODEL=llama3.2:latest` for a smaller (less reliable) model.
+
+---
+
 ## ⚙️ Persona Configuration
 
 The model, persona and enabled tools live in [`sebas_main/configs/sebas/config.toml`](sebas_main/configs/sebas/config.toml). The persona is `default_system_prompt` under `[agent]`; the enabled tools are `tools` in the same section.
@@ -187,14 +213,14 @@ The model, persona and enabled tools live in [`sebas_main/configs/sebas/config.t
 ## 🛡️ Privacy
 
 - **Audio never leaves the laptop.** Listening, name detection and speech synthesis run locally on the CPU.
-- **Requests do.** The transcribed text of what you say *after* "Sebas", and the results of the tools Sebas uses, are sent to Anthropic's API to compose the reply.
+- **Requests do, when Claude is in use.** The transcribed text of what you say *after* "Sebas", and the results of the tools Sebas uses, are sent to Anthropic's API to compose the reply. On the local model, nothing leaves the laptop except the tools' own API calls.
 - Secrets stay in `sebas_main/.env`, which git ignores.
 
 ---
 
 ## 🧪 Status
 
-Every component has been tested on its own and in a full loop with simulated audio and a simulated API. Not yet tested with a live API key, a real microphone and voice, real Vercel/GitHub/AWS/Steam accounts, or the Google sign-in.
+Every component has been tested on its own and in a full loop with simulated audio and a simulated API. Offline mode has been tested with the real `qwen2.5` model: starting without a key, starting with Claude unreachable, and losing the connection mid-conversation. Not yet tested with a live Claude API key, a real microphone and voice, real Vercel/GitHub/AWS/Steam accounts, or the Google sign-in.
 
 At startup OpenJarvis logs that its optional Rust extension (`openjarvis_rust`) is missing. Sebas does not use the features that need it; memory works through `MEMORY.md` instead.
 
