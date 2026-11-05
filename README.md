@@ -26,7 +26,7 @@ flowchart TD
     end
 
     subgraph Intelligence["🧠 Cognitive Engine"]
-        STT --> Brain["OpenJarvis Orchestrator\nSystemBuilder + 20-message history"]
+        STT --> Brain["OpenJarvis Orchestrator\n20-message history + MEMORY.md"]
         STT2 --> Brain
         Brain <--> Claude["Anthropic Claude\n(claude-opus-5-5)"]
         Brain <--> Tools["custom_tools/\n• Vercel & AWS (read-only)\n• GitHub\n• Steam & Bookswagon\n• Morning briefing + Google Calendar\n• Laptop actions (allowlist)"]
@@ -37,6 +37,8 @@ flowchart TD
         TextFormatter --> TTS["Kokoro TTS (CPU)\nbm_george"]
         TTS -- "Sentence pipeline" --> Speakers["Speakers"]
     end
+
+    Speakers -. "chime: 8 s follow-up window, no 'Sebas' needed" .-> STT
 ```
 
 ---
@@ -47,6 +49,8 @@ flowchart TD
   - *"Sebas, rise."* → he answers *"At your service."* and listens for your request.
   - *"Sebas, open YouTube."* → the request is handled in one breath.
   - Speech that doesn't begin with "Sebas" is transcribed locally and discarded.
+- **Conversation mode**: after each reply a soft chime means he is still listening for 8 seconds, so follow-ups ("And the other project?") need no "Sebas". Silence ends the conversation.
+- **Long-term memory**: *"Sebas, remember that I prefer metric units."* Facts are kept in `~/.openjarvis/MEMORY.md`, a plain file you can read and edit, and are included in every conversation, including after a restart.
 - **Local voice pipeline**: `faster-whisper` for listening (`tiny.en` to catch the name, `small.en` for requests, `int8` on CPU) and `Kokoro` for speaking (`bm_george`). Synthesis runs a sentence ahead of playback, so replies flow without pauses.
 - **Butler persona**: formal, concise, no emojis or "As an AI...", and calm reports when something fails.
 - **Tools**:
@@ -57,6 +61,7 @@ flowchart TD
   | Leisure | `steam_wishlist` (discounts), `bookswagon_new_releases` (new light novels since the last check) | Read-only |
   | Daily | `morning_briefing` (time, weather, Google Calendar), `get_weather` | Read-only |
   | Laptop | `open_app`, `open_website`, `open_workspace`, `run_shortcut`, `system_status`, `set_volume`, `lock_screen`, `set_reminder`, `list_reminders` | Only what `laptop.toml` allows |
+  | Memory | `remember`, `forget` | Writes only `MEMORY.md` |
 - **Modes**: voice, text (`--text`) and microphone calibration (`--mic-test`).
 
 ---
@@ -86,7 +91,8 @@ sebas/
         ├── leisure_tracker.py       # Steam, Bookswagon
         ├── morning_briefing.py      # Time, weather, calendar
         ├── setup_google_calendar.py # One-time Google sign-in
-        └── laptop.py                # Laptop actions and reminders
+        ├── laptop.py                # Laptop actions and reminders
+        └── memory.py                # remember / forget (MEMORY.md)
 ```
 
 ---
@@ -134,6 +140,7 @@ Then fill in `.env`. Only `ANTHROPIC_API_KEY` is required; each tool tells you w
 | `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` | Calendar in the briefing | See below |
 | `SEBAS_VOICE` | Speech | `bm_george` (default), `bm_lewis`, `bm_daniel`, `bm_fable` |
 | `SEBAS_SILENCE_THRESHOLD` | Listening | Use the value `--mic-test` suggests (default 500) |
+| `SEBAS_FOLLOW_UP_SECONDS` | Conversation mode | How long to wait for a follow-up (default 8; `0` turns it off) |
 | `SEBAS_NAME_MODEL`, `SEBAS_WHISPER_MODEL` | Listening | Defaults `tiny.en` and `small.en` |
 
 **Google Calendar (optional):** in Google Cloud Console, enable the Google Calendar API, create an OAuth client of type *Desktop app*, put its ID and secret in `.env`, then run this once:
@@ -162,6 +169,8 @@ Then fill in `.env`. Only `ANTHROPIC_API_KEY` is required; each tool tells you w
    > *"Sebas, open workspace."* (he asks which project, then opens it in Antigravity with Claude in the terminal and Gemini in the browser)
    >
    > *"Sebas, remind me in twenty minutes to stretch."*
+   >
+   > *"Sebas, remember that my main project is the portfolio site."*
 
 3. **Text mode** (quiet rooms, testing): `run.bat --text`
 
@@ -185,7 +194,9 @@ The model, persona and enabled tools live in [`sebas_main/configs/sebas/config.t
 
 ## 🧪 Status
 
-Every component has been tested on its own and in a full loop with simulated audio and a simulated API. Not yet tested with a live API key, a real microphone and voice, real Vercel/GitHub/AWS/Steam accounts, or the Google sign-in. Long-term memory (OpenJarvis's memory store) needs its optional Rust extension and is not enabled yet; conversation history within a session works.
+Every component has been tested on its own and in a full loop with simulated audio and a simulated API. Not yet tested with a live API key, a real microphone and voice, real Vercel/GitHub/AWS/Steam accounts, or the Google sign-in.
+
+At startup OpenJarvis logs that its optional Rust extension (`openjarvis_rust`) is missing. Sebas does not use the features that need it; memory works through `MEMORY.md` instead.
 
 ---
 
