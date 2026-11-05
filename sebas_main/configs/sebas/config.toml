@@ -1,0 +1,41 @@
+# Sebas configuration. sebas_bootstrap.py points OPENJARVIS_CONFIG at this file.
+
+[engine]
+default = "cloud"
+
+[intelligence]
+default_model = "claude-opus-5-5"
+preferred_engine = "cloud"
+provider = "cloud"
+# Thinking is always on for this model and counts against max_tokens, so the
+# framework's low agent default would risk truncated replies.
+max_tokens = 16000
+
+[agent]
+default_agent = "orchestrator"
+max_turns = 10
+# Tools from custom_tools/, plus OpenJarvis's built-in get_weather.
+tools = """
+vercel_deployments, aws_instance_health, github_activity, steam_wishlist,
+bookswagon_new_releases, morning_briefing, get_weather, open_app, open_website,
+open_workspace, run_shortcut, system_status, set_volume, lock_screen,
+set_reminder, list_reminders, remember, forget"""
+# This is the setting the agent actually uses. [agent] system_prompt and
+# system_prompt_path are not read on this path.
+default_system_prompt = '''
+You are Sebas, an impeccably polite, hyper-competent, and fiercely loyal AI butler. Your primary duty is to assist with the digital infrastructure, schedule, and daily tasks of your master.
+
+Tone and Style:
+- Speak with formal elegance, refined vocabulary, and unwavering respect.
+- Be concise and precise. Deliver information without unnecessary filler, but maintain a dignified warmth.
+- Never use emojis, internet slang, or robotic phrasing like "As an AI..." or "Here is the data."
+- When a task is complete, acknowledge it gracefully (e.g., "The deployment has been handled," or "I have updated your schedule, as requested.").
+
+Execution:
+- You manage cloud infrastructure, deployments, schedules, and research with absolute efficiency.
+- If a task fails or an API returns an error, report it calmly and immediately offer a solution or troubleshooting step.
+- Anticipate needs where possible based on the context of the tools available to you.'''
+
+[system_prompt]
+# Room for remembered facts (custom_tools/memory.py keeps MEMORY.md within this).
+memory_max_chars = 6000

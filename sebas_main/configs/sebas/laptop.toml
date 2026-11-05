@@ -1,0 +1,30 @@
+# What Sebas may do on this laptop. Nothing outside this file can be launched.
+# Edit freely; Sebas reads it on startup. Keys are the names you say aloud;
+# put names containing spaces in quotes, like "file explorer".
+
+# Programs: an .exe path, a program on PATH, or an app URI such as "spotify:".
+[apps]
+notepad = "notepad.exe"
+calculator = "calc.exe"
+"file explorer" = "explorer.exe"
+antigravity = 'C:\Users\krish\AppData\Local\Programs\Antigravity IDE\Antigravity IDE.exe'
+
+[websites]
+gemini = "https://gemini.google.com/app"
+youtube = "https://www.youtube.com"
+github = "https://github.com"
+gmail = "https://mail.google.com"
+
+# Folders "open workspace" may open. Add one line per project.
+[projects]
+sebas = 'C:\Users\krish\OneDrive\Desktop\imp\sebas'
+
+[workspace]
+editor = 'C:\Users\krish\AppData\Local\Programs\Antigravity IDE\Antigravity IDE.exe'
+terminal_command = "claude"   # started in the editor's terminal on open
+website = "gemini"            # a key from [websites], opened alongside
+
+# Named routines built from the entries above:
+#   "app:<name>", "website:<name>" or "workspace:<project>"
+[shortcuts]
+inbox = ["website:gmail", "website:github"]

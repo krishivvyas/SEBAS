@@ -1,0 +1,51 @@
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Virtual environments
+.venv/
+*/.venv/
+venv/
+*/venv/
+env/
+*/env/
+
+# Distribution / packaging
+dist/
+build/
+*.egg-info/
+*.egg
+
+# Secrets (never commit credentials)
+.env
+.env.*
+*.env
+!.env.example
+!**/.env.example
+!.env.template
+!**/.env.template
+
+# IDE & Editor caches
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# Testing & Linting
+.pytest_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# Databases & local logs
+*.sqlite
+*.db
+*.log
+results/
+logs/
+
+# Operating System files
+.DS_Store
+Thumbs.db
