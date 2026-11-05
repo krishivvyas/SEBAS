@@ -1,0 +1,3 @@
+# Desktop interface (ui_app.py). Uses Windows' built-in Edge WebView2.
+#   uv pip install -r requirements_ui.txt
+pywebview>=5

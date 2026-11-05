@@ -1,0 +1,284 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Sebas</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body data-state="idle" data-ambient="on">
+
+<canvas id="dust"></canvas>
+<div class="scanlines"></div>
+<div class="grain"></div>
+
+<!-- Boot sequence -->
+<div id="boot" aria-hidden="true">
+  <svg viewBox="0 0 200 200">
+    <defs>
+      <linearGradient id="bootBrass" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0" stop-color="#f1d892"/><stop offset="0.55" stop-color="#c9a45c"/><stop offset="1" stop-color="#7a5a26"/>
+      </linearGradient>
+    </defs>
+    <path class="draw" d="M100 8 L192 100 L100 192 L8 100 Z" fill="none" stroke="url(#bootBrass)" stroke-width="2"/>
+    <path class="draw d2" d="M100 26 L174 100 L100 174 L26 100 Z" fill="none" stroke="url(#bootBrass)" stroke-width="1"/>
+    <circle class="draw d3" cx="100" cy="100" r="46" fill="none" stroke="#5fe3d6" stroke-width="1" opacity="0.7"/>
+    <g class="draw d3" stroke="url(#bootBrass)" stroke-width="1">
+      <line x1="100" y1="8" x2="100" y2="26"/><line x1="100" y1="174" x2="100" y2="192"/>
+      <line x1="8" y1="100" x2="26" y2="100"/><line x1="174" y1="100" x2="192" y2="100"/>
+    </g>
+    <text class="boot-s" x="100" y="121" text-anchor="middle" font-family="Cinzel, serif" font-weight="700" font-size="62" fill="url(#bootBrass)">S</text>
+  </svg>
+  <div class="boot-line"></div>
+  <div class="boot-title">SEBAS</div>
+  <div class="boot-sub">At your service.</div>
+</div>
+
+<!-- Title bar -->
+<header class="titlebar">
+  <div class="drag pywebview-drag-region">
+    <svg class="crest-small" viewBox="0 0 40 40" aria-hidden="true">
+      <path d="M20 1.5 L38.5 20 L20 38.5 L1.5 20 Z" fill="rgba(201,164,92,0.08)" stroke="#c9a45c" stroke-width="1.2"/>
+      <path d="M20 6 L34 20 L20 34 L6 20 Z" fill="none" stroke="#7a5a26" stroke-width="0.8"/>
+      <text x="20" y="25.5" text-anchor="middle" font-family="Cinzel, serif" font-weight="700" font-size="15" fill="#f1d892">S</text>
+    </svg>
+    <div class="brand">
+      <h1>SEBAS</h1>
+      <p>Household Intelligence · Est. MMXXVI</p>
+    </div>
+  </div>
+  <div class="status">
+    <span id="mode-badge" class="badge">Waking</span>
+    <span class="state-pill"><i></i><span id="state-label">Idle</span></span>
+    <span id="clock">--:--</span>
+  </div>
+  <div class="controls">
+    <button id="btn-sound" title="Interface sounds">♪</button>
+    <button id="btn-ambient" title="Ambient effects">✦</button>
+    <button id="btn-min" title="Minimise">–</button>
+    <button id="btn-close" title="Dismiss Sebas">✕</button>
+  </div>
+</header>
+
+<main>
+  <!-- Conversation -->
+  <section class="panel ledger">
+    <h2 class="panel-title"><span>The Ledger</span></h2>
+    <div id="ledger" class="ledger-list">
+      <div class="ledger-empty" id="ledger-empty">
+        Good day. Your conversations with Sebas are recorded here.
+        <b>Say “Sebas, rise”</b>
+      </div>
+    </div>
+  </section>
+
+  <!-- Avatar -->
+  <section class="stage">
+    <div class="reticle"><i></i><i></i><i></i><i></i></div>
+    <div class="telemetry" id="telemetry">
+      Unit <b>S-01</b><br>Voice <b id="tel-voice">—</b><br>Mind <b id="tel-mind">—</b>
+    </div>
+
+    <div class="avatar-wrap">
+      <canvas id="halo"></canvas>
+      <svg id="avatar" viewBox="0 0 400 400" aria-label="Sebas">
+        <defs>
+          <linearGradient id="brassGrad" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0" stop-color="#f6e2a4"/><stop offset="0.5" stop-color="#c9a45c"/><stop offset="1" stop-color="#8a652b"/>
+          </linearGradient>
+          <linearGradient id="silverGrad" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0" stop-color="#f4f1ea" stop-opacity="0.95"/><stop offset="1" stop-color="#9aa3b5" stop-opacity="0.85"/>
+          </linearGradient>
+          <radialGradient id="bustFill" cx="0.5" cy="0.35" r="0.75">
+            <stop offset="0" stop-color="#22345a" stop-opacity="0.92"/><stop offset="1" stop-color="#0a1020" stop-opacity="0.95"/>
+          </radialGradient>
+          <linearGradient id="sweepGrad" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0" stop-color="#5fe3d6" stop-opacity="0"/><stop offset="0.5" stop-color="#5fe3d6" stop-opacity="0.22"/><stop offset="1" stop-color="#5fe3d6" stop-opacity="0"/>
+          </linearGradient>
+          <pattern id="scan" width="4" height="4" patternUnits="userSpaceOnUse">
+            <rect width="4" height="1.2" fill="rgba(95,227,214,0.13)"/>
+          </pattern>
+          <filter id="glowBrass" x="-30%" y="-30%" width="160%" height="160%">
+            <feGaussianBlur stdDeviation="2.4" result="b"/>
+            <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+          </filter>
+          <filter id="glowCyan" x="-200%" y="-200%" width="500%" height="500%">
+            <feGaussianBlur stdDeviation="2.2" result="b"/>
+            <feMerge><feMergeNode in="b"/><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+          </filter>
+          <clipPath id="bustClip">
+            <path d="M60 400 L66 330 C72 300 96 284 132 272 L170 250 L185 220 L215 220 L230 250 L268 272 C304 284 328 300 334 330 L340 400 Z"/>
+            <path transform="translate(0 40)" d="M156 118 C150 92 162 66 196 60 C226 56 248 72 246 104 L240 132 C240 154 232 170 220 182 C212 190 206 196 200 196 C194 196 188 190 180 182 C168 170 160 154 160 132 Z"/>
+          </clipPath>
+          <filter id="rimLight" x="-10%" y="-10%" width="120%" height="120%">
+            <feDropShadow dx="0" dy="0" stdDeviation="2.2" flood-color="#5fe3d6" flood-opacity="0.45"/>
+          </filter>
+        </defs>
+
+        <!-- Art Deco sunburst and clockwork rings (ticks and teeth are added by app.js) -->
+        <g class="sunburst" id="sunburst"></g>
+        <circle cx="200" cy="200" r="188" fill="none" stroke="#c9a45c" stroke-opacity="0.35" stroke-width="0.8"/>
+        <g class="ring ring-outer" id="ring-outer"></g>
+        <g class="ring ring-mid">
+          <circle cx="200" cy="200" r="171" fill="none" stroke-width="2" stroke-dasharray="46 10 6 10 2 10"/>
+        </g>
+        <g class="ring ring-gear" id="ring-gear"></g>
+        <g class="ring ring-orbit">
+          <circle cx="200" cy="44" r="3.4" fill="#5fe3d6" filter="url(#glowCyan)"/>
+          <circle cx="200" cy="356" r="2.2" fill="#f1d892"/>
+        </g>
+        <g stroke="#5fe3d6" stroke-opacity="0.55" stroke-width="1">
+          <line x1="200" y1="4" x2="200" y2="20"/><line x1="200" y1="380" x2="200" y2="396"/>
+          <line x1="4" y1="200" x2="20" y2="200"/><line x1="380" y1="200" x2="396" y2="200"/>
+        </g>
+
+        <!-- The butler: cel-shaded, after the reference portrait. Animated by app.js
+             through data attributes: data-mouth (0-3), data-blink, data-nod, data-pat. -->
+        <g id="bust" filter="url(#rimLight)">
+          <g id="torso">
+            <!-- waistcoat and shirt (seen through the open coat) -->
+            <path class="ol waistcoat" d="M166 250 L200 266 L234 250 L250 400 L150 400 Z"/>
+            <path class="waistcoat-shade" d="M166 250 L184 258 L194 400 L150 400 Z"/>
+            <path class="ol shirt" d="M176 256 L200 268 L224 256 L214 300 L200 332 L186 300 Z"/>
+            <path class="ol-thin" d="M186 300 L200 332 L214 300"/>
+            <circle class="button" cx="200" cy="350" r="2.8"/><circle class="button" cx="200" cy="374" r="2.8"/><circle class="button" cx="200" cy="398" r="2.8"/>
+            <!-- cravat -->
+            <path class="ol cravat" d="M195 284 L205 284 L213 318 L200 336 L187 318 Z"/>
+            <path class="ol-thin" d="M200 288 L198 330" opacity="0.5"/>
+            <path class="ol cravat" d="M191 271 L209 271 L206 285 L194 285 Z"/>
+            <!-- black tailcoat, open at the front -->
+            <path class="ol coat" d="M60 400 L66 330 C72 300 96 284 132 272 L170 250 L186 400 Z"/>
+            <path class="ol coat" d="M340 400 L334 330 C328 300 304 284 268 272 L230 250 L214 400 Z"/>
+            <path class="coat-hi" d="M88 300 C100 290 116 282 132 276" />
+            <path class="coat-hi" d="M312 300 C300 290 284 282 268 276" />
+            <!-- notched lapels -->
+            <path class="ol lapel" d="M170 250 L186 264 L182 278 L172 281 L182 362 L174 364 L142 292 L148 270 Z"/>
+            <path class="ol lapel" d="M230 250 L214 264 L218 278 L228 281 L218 362 L226 364 L258 292 L252 270 Z"/>
+            <!-- pocket square -->
+            <path class="ol-thin" d="M270 304 L304 296"/>
+            <path class="ol shirt" d="M274 302 L298 294 L296 286 L286 292 L278 288 Z"/>
+            <!-- wing collar -->
+            <path class="ol shirt" d="M178 240 L198 266 L184 274 L170 256 Z"/>
+            <path class="ol shirt" d="M222 240 L202 266 L216 274 L230 256 Z"/>
+            <!-- napkin draped over the arm -->
+            <path class="ol napkin" d="M262 352 C284 344 314 348 330 364 L344 400 L254 400 C258 384 258 366 262 352 Z"/>
+            <path class="napkin-fold" d="M280 356 C290 372 292 386 290 400 M306 356 C312 370 316 384 318 400"/>
+          </g>
+
+          <!-- neck -->
+          <path class="ol skin" d="M185 220 L185 250 Q200 258 215 250 L215 220 Z"/>
+          <path class="skin-shade" d="M185 224 L215 224 L215 236 Q200 246 185 236 Z"/>
+
+          <g transform="translate(0 40)">
+          <g id="head">
+            <!-- ears -->
+            <path class="ol skin" d="M161 116 C152 112 149 132 155 142 C157 147 162 147 164 143 Z"/>
+            <path class="ol skin" d="M239 116 C248 112 251 132 245 142 C243 147 238 147 236 143 Z"/>
+            <!-- face -->
+            <path class="ol skin" d="M160 104 C160 90 174 82 200 82 C226 82 240 90 240 104 L240 132 C240 154 232 170 220 182 C212 190 206 194 200 194 C194 194 188 190 180 182 C168 170 160 154 160 132 Z"/>
+            <!-- trimmed beard and goatee -->
+            <path class="ol-thin beard" d="M161 128 C162 152 170 170 182 182 C190 190 196 196 200 196 C204 196 210 190 218 182 C230 170 238 152 239 128 L236 130 C234 148 228 160 218 166 C212 158 206 157 200 157 C194 157 188 158 182 166 C172 160 166 148 164 130 Z"/>
+            <path class="beard-shade" d="M190 184 C196 190 204 190 210 184 C206 192 194 192 190 184 Z"/>
+            <!-- moustache -->
+            <path class="ol-thin moustache" d="M181 161 C187 154 196 154 200 158 C204 154 213 154 219 161 C213 165 206 163 200 161 C194 163 187 165 181 161 Z"/>
+            <!-- mouth: four frames, chosen by data-mouth -->
+            <g class="mouth m0"><path class="ol-thin" d="M191 169 Q200 171 209 169"/></g>
+            <g class="mouth m1"><path class="mouth-in" d="M192 168 Q200 167 208 168 Q200 174 192 168 Z"/></g>
+            <g class="mouth m2"><path class="mouth-in" d="M191 167 Q200 165 209 167 Q206 177 200 177 Q194 177 191 167 Z"/><path class="teeth" d="M193 167.5 Q200 166 207 167.5 L206 170 Q200 169 194 170 Z"/></g>
+            <g class="mouth m3"><path class="mouth-in" d="M190 166 Q200 163 210 166 Q208 182 200 182 Q192 182 190 166 Z"/><path class="teeth" d="M192 166.5 Q200 164.5 208 166.5 L207 169.5 Q200 168 193 169.5 Z"/></g>
+            <!-- nose and age lines -->
+            <path class="ol-thin" d="M201 126 L196 146 Q200 149 205 147"/>
+            <path class="crease" d="M187 146 Q182 154 184 162 M213 146 Q218 154 216 162 M180 94 Q200 90 220 94 M186 100 Q200 97 214 100"/>
+            <!-- eyes: open and closed frames -->
+            <g class="eyes-open">
+              <path class="white" d="M173 125 Q182 119 191 125 Q182 129 173 125 Z"/>
+              <path class="white" d="M209 125 Q218 119 227 125 Q218 129 209 125 Z"/>
+              <g class="iris"><circle cx="182" cy="125" r="3.3"/><circle cx="218" cy="125" r="3.3"/></g>
+              <path class="lid" d="M172 125 Q182 117 192 124 M208 124 Q218 117 228 125"/>
+            </g>
+            <path class="eyes-closed lid" d="M172 125 Q182 129 192 125 M208 125 Q218 129 228 125"/>
+            <!-- brows -->
+            <path class="brow" d="M169 114 Q181 107 194 111"/>
+            <path class="brow" d="M206 111 Q219 107 231 114"/>
+            <!-- rectangular wire glasses -->
+            <g class="glasses">
+              <rect class="lens" x="168" y="115" width="28" height="18" rx="4"/>
+              <rect class="lens" x="204" y="115" width="28" height="18" rx="4"/>
+              <path class="frame" d="M196 120 Q200 117 204 120 M168 119 L159 118 M232 119 L241 118"/>
+              <path class="glint" d="M172 129 L180 118 M176 131 L182 123 M208 129 L216 118 M212 131 L218 123"/>
+            </g>
+            <!-- swept-back silver hair -->
+            <path class="ol hair" d="M157 120 C150 92 162 64 196 59 C228 55 249 72 246 104 L242 122 C241 106 237 96 231 91 C221 84 207 82 197 83 C181 84 169 90 165 100 C161 107 160 113 159 122 Z"/>
+            <path class="hair-hi" d="M170 80 Q194 66 226 70 M166 94 Q190 78 234 86 M178 70 Q200 61 222 63"/>
+            <path class="hair-line" d="M172 88 Q196 74 236 80 M162 104 Q170 86 196 79 M240 100 Q238 84 224 76"/>
+          </g>
+          </g>
+
+          <!-- the right hand, resting on the heart -->
+          <g id="hand">
+            <path class="ol coat" d="M92 400 C108 372 150 344 190 324 L204 344 C170 362 140 382 130 400 Z"/>
+            <path class="ol shirt" d="M188 322 L203 316 L212 338 L198 345 Z"/>
+            <g transform="rotate(-24 204 330)">
+            <path class="ol skin" d="M203 318 C214 306 236 300 258 301 C267 302 268 310 260 313 L242 316 C254 316 267 318 269 324 C270 331 259 331 251 330 C259 333 261 339 253 341 L233 341 C225 345 214 345 208 341 Z"/>
+            <path class="ol-thin" d="M242 316 L230 318 M251 330 L234 330 M222 312 C226 303 232 298 239 297"/>
+            </g>
+          </g>
+
+          <!-- hologram overlays -->
+          <g clip-path="url(#bustClip)" class="holo-layer">
+            <rect class="holo-scan" x="40" y="50" width="320" height="380" fill="url(#scan)"/>
+            <rect class="holo-sweep" x="40" y="50" width="320" height="120"/>
+          </g>
+        </g>
+      </svg>
+    </div>
+
+    <div class="state-caption" id="caption">At Rest</div>
+    <div class="state-hint" id="hint">Say “Sebas, rise”, or ring the bell.</div>
+    <div class="ticker" id="ticker"></div>
+  </section>
+
+  <!-- Household -->
+  <section class="panel household">
+    <h2 class="panel-title"><span>The Household</span></h2>
+    <div class="body">
+      <div class="dials" id="dials"></div>
+
+      <h3 class="sub">Engagements</h3>
+      <ul class="list" id="reminders"><li class="empty">No engagements pending.</li></ul>
+
+      <h3 class="sub">Memoranda</h3>
+      <ul class="list" id="memory"><li class="empty">Nothing committed to memory.</li></ul>
+
+      <h3 class="sub">The Mind</h3>
+      <dl class="mind">
+        <dt>Engine</dt><dd id="mind-engine">—</dd>
+        <dt>Last reply</dt><dd id="mind-latency">—</dd>
+        <dt>Ear</dt><dd><div class="meter"><i id="mic-meter"></i></div></dd>
+      </dl>
+    </div>
+  </section>
+</main>
+
+<footer class="service">
+  <div class="quick">
+    <button data-ask="Good morning, Sebas. My briefing, please.">Morning Briefing</button>
+    <button data-ask="Please open my workspace.">Open Workspace</button>
+    <button data-ask="How are my Vercel deployments?">Deployments</button>
+    <button data-ask="Anything new on GitHub?">GitHub</button>
+    <button data-ask="How is my laptop doing?">System Status</button>
+  </div>
+  <form class="bellbar" id="bell-form" autocomplete="off">
+    <button type="button" id="bell" title="Ring the bell to speak">
+      <svg viewBox="0 0 24 24" fill="none" stroke="#2a1c06" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M5 17h14l-1.6-2.2V10a5.4 5.4 0 0 0-10.8 0v4.8z"/><path d="M10 20.2a2.2 2.2 0 0 0 4 0"/><path d="M12 3v1.6"/>
+      </svg>
+    </button>
+    <input id="ask" placeholder="Ring for Sebas…" maxlength="2000">
+    <button type="submit" class="send">Send</button>
+  </form>
+</footer>
+
+<script src="app.js"></script>
+</body>
+</html>

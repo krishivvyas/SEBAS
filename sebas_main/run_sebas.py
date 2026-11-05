@@ -1,6 +1,8 @@
 """Run Sebas: "Sebas" -> speech recognition -> orchestrator -> speech output.
 
-    python run_sebas.py             Voice mode: "Sebas, rise" or "Sebas, <request>"
+    python run_sebas.py --ui        Desktop interface (voice and typing)
+    python run_sebas.py --ui --no-voice   Desktop interface, typing only
+    python run_sebas.py             Voice mode in the console: "Sebas, rise" or "Sebas, <request>"
     python run_sebas.py --text      Type instead of speaking; prints the replies
     python run_sebas.py --mic-test  Measure microphone levels and suggest a threshold
 """
@@ -17,6 +19,7 @@ from sebas_bootstrap import load_env
 load_env()  # Must run before anything imports openjarvis.
 
 from sebas_brain import Brain  # noqa: E402  (Claude, or a local model offline)
+from sebas_events import emit  # noqa: E402
 
 logger = logging.getLogger("sebas")
 
@@ -39,12 +42,20 @@ def run_voice_turn(listener, ears, mouth, brain, follow_up_seconds: float = 0.0)
     from voice_pipeline.name_listener import is_summon, request_text, split_address
 
     print('Listening for "Sebas"...', flush=True)
+    emit("state", state="idle")
     pcm, remainder = listener.wait()
-    if is_summon(remainder):
-        mouth.speak(_SUMMON_REPLY)
+    if pcm is None:  # the UI's bell: go straight to listening
         mouth.chime()
+        emit("state", state="listening")
+        text = ears.listen(wait_seconds=max(follow_up_seconds, 6.0))
+    elif is_summon(remainder):
+        mouth.speak(_SUMMON_REPLY)
+        emit("transcript", role="sebas", text=_SUMMON_REPLY)
+        mouth.chime()
+        emit("state", state="listening")
         text = ears.listen(wait_seconds=max(follow_up_seconds, 6.0))
     else:
+        emit("state", state="thinking")
         # The quick model only decides whether Sebas was addressed; the
         # accurate model re-reads the same audio for the request itself.
         accurate = split_address(ears.transcribe(pcm))
@@ -52,23 +63,29 @@ def run_voice_turn(listener, ears, mouth, brain, follow_up_seconds: float = 0.0)
 
     while text:
         print(f"You:   {text}", flush=True)
+        emit("transcript", role="user", text=text)
+        emit("state", state="thinking")
         try:
             reply = brain.ask(text)
         except Exception:
             logger.exception("The request failed")
             reply = _FAILURE_REPLY
         print(f"Sebas: {reply}", flush=True)
+        emit("transcript", role="sebas", text=reply)
         try:
             mouth.speak(reply)
         except Exception:
             logger.exception("Speech output failed")
         if follow_up_seconds <= 0:
-            return
+            break
         mouth.chime()  # still listening
+        emit("state", state="listening")
         text = ears.listen(wait_seconds=follow_up_seconds)
+    emit("state", state="idle")
 
 
-def run_voice(brain) -> None:
+def load_voice():
+    """Load the speech models. Returns (listener, ears, mouth)."""
     from voice_pipeline.ears import Ears
     from voice_pipeline.mouth import Mouth
     from voice_pipeline.name_listener import NameListener
@@ -82,6 +99,15 @@ def run_voice(brain) -> None:
     listener = NameListener(quick_ears, threshold)
     mouth = Mouth(voice=os.environ.get("SEBAS_VOICE") or "bm_george")
     mouth.load()
+    return listener, ears, mouth
+
+
+def follow_up_seconds() -> float:
+    return float(os.environ.get("SEBAS_FOLLOW_UP_SECONDS") or 8)
+
+
+def run_voice(brain) -> None:
+    listener, ears, mouth = load_voice()
 
     from custom_tools.laptop import set_announcer
 
@@ -90,10 +116,9 @@ def run_voice(brain) -> None:
         mouth.speak(text)
 
     set_announcer(announce)
-    follow_up = float(os.environ.get("SEBAS_FOLLOW_UP_SECONDS") or 8)
     print('Ready. Say "Sebas, rise", or "Sebas" followed by a request.', flush=True)
     while True:
-        run_voice_turn(listener, ears, mouth, brain, follow_up)
+        run_voice_turn(listener, ears, mouth, brain, follow_up_seconds())
 
 
 def run_text(brain) -> None:
@@ -134,6 +159,10 @@ def mic_test(seconds: int = 6) -> None:
 
 def main() -> int:
     parser = argparse.ArgumentParser(description="Run the Sebas voice assistant.")
+    parser.add_argument("--ui", action="store_true", help="open the desktop interface")
+    parser.add_argument(
+        "--no-voice", action="store_true", help="with --ui: typing only, no microphone"
+    )
     parser.add_argument("--text", action="store_true", help="type instead of speaking")
     parser.add_argument(
         "--mic-test", action="store_true", help="measure microphone levels and exit"
@@ -144,6 +173,10 @@ def main() -> int:
     if args.mic_test:
         mic_test()
         return 0
+    if args.ui:
+        from ui_app import run_ui
+
+        return run_ui(voice=not args.no_voice)
     try:
         brain = Brain()
     except RuntimeError as exc:

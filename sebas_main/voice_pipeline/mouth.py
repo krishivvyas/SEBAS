@@ -12,7 +12,24 @@ import soundfile as sf
 from openjarvis.speech.kokoro_tts import KokoroTTSBackend
 from openjarvis.speech.voice_io import play_wav
 
+from sebas_events import emit
+
 _CHIME_RATE = 24000
+_ENVELOPE_STEP = 0.04  # seconds per loudness value sent to the UI
+
+
+def loudness_envelope(wav_bytes: bytes) -> list[float]:
+    """Loudness of a WAV clip in 40 ms steps, scaled to 0..1, for lip-sync."""
+    data, rate = sf.read(io.BytesIO(wav_bytes), dtype="float32")
+    if data.ndim > 1:
+        data = data.mean(axis=1)
+    step = max(1, int(rate * _ENVELOPE_STEP))
+    usable = data[: data.size - data.size % step]
+    if usable.size == 0:
+        return []
+    rms = np.sqrt(np.mean(usable.reshape(-1, step) ** 2, axis=1))
+    peak = float(rms.max()) or 1.0
+    return [round(float(v) / peak, 3) for v in rms]
 
 
 def clean_for_speech(text: str) -> str:
@@ -68,9 +85,14 @@ class Mouth:
                 ready.put(None)
 
         threading.Thread(target=produce, daemon=True).start()
-        while (audio := ready.get()) is not None:
-            if audio:
-                play_wav(audio)
+        emit("state", state="speaking")
+        try:
+            while (audio := ready.get()) is not None:
+                if audio:
+                    emit("speech", envelope=loudness_envelope(audio), step=_ENVELOPE_STEP)
+                    play_wav(audio)
+        finally:
+            emit("state", state="idle")
         if failures:
             raise failures[0]
 

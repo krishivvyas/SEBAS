@@ -12,11 +12,13 @@ from __future__ import annotations
 import collections
 import logging
 import re
+import threading
 from difflib import SequenceMatcher
 
 import numpy as np
 import sounddevice as sd
 
+from sebas_events import emit
 from voice_pipeline.ears import Ears
 
 logger = logging.getLogger(__name__)
@@ -79,12 +81,21 @@ def request_text(remainder: str) -> str:
     return re.sub(r"^a?rise\b[,.!]?\s*(and\s+)?", "", remainder, flags=re.IGNORECASE).strip()
 
 
+class PushToTalk(Exception):
+    """Raised inside the listener when the UI's bell button is pressed."""
+
+
 class NameListener:
     """Waits until someone says a sentence starting with "Sebas"."""
 
     def __init__(self, ears: Ears, silence_threshold: int) -> None:
         self._ears = ears
         self._threshold = silence_threshold
+        self._push_to_talk = threading.Event()
+
+    def push_to_talk(self) -> None:
+        """Stop waiting for the name; the next utterance is a request."""
+        self._push_to_talk.set()
 
     def next_utterance(self, stream) -> np.ndarray:
         """Read frames until one stretch of speech has been captured."""
@@ -92,9 +103,14 @@ class NameListener:
         frames: list[np.ndarray] = []
         loud = quiet = 0
         while True:
+            if self._push_to_talk.is_set():
+                self._push_to_talk.clear()
+                raise PushToTalk
             frame, _ = stream.read(_FRAME)
             frame = frame[:, 0].copy()
-            is_loud = float(np.sqrt(np.mean(frame.astype(np.float64) ** 2))) >= self._threshold
+            rms = float(np.sqrt(np.mean(frame.astype(np.float64) ** 2)))
+            emit("mic", level=min(1.0, rms / (self._threshold * 8)))
+            is_loud = rms >= self._threshold
             if not frames:
                 pre_roll.append(frame)
                 if is_loud:
@@ -111,11 +127,17 @@ class NameListener:
                 pre_roll.clear()
                 frames, loud, quiet = [], 0, 0  # a click or cough; keep waiting
 
-    def wait(self) -> tuple[np.ndarray, str]:
-        """Return the audio and the words after "Sebas" for the next address."""
+    def wait(self) -> tuple[np.ndarray | None, str]:
+        """Return the audio and the words after "Sebas" for the next address.
+
+        Returns ``(None, "")`` when push-to-talk interrupts the wait.
+        """
         with sd.InputStream(samplerate=_RATE, channels=1, dtype="int16", blocksize=_FRAME) as stream:
             while True:
-                pcm = self.next_utterance(stream)
+                try:
+                    pcm = self.next_utterance(stream)
+                except PushToTalk:
+                    return None, ""
                 text = self._ears.transcribe(pcm)
                 remainder = split_address(text)
                 if remainder is not None:

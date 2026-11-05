@@ -18,6 +18,8 @@ from urllib.parse import urlparse
 
 import httpx
 
+from sebas_events import emit
+
 logger = logging.getLogger("sebas")
 
 OLLAMA_URL = os.environ.get("OLLAMA_HOST", "http://localhost:11434").rstrip("/")
@@ -133,6 +135,8 @@ class Brain:
         self.mode = "local"
         self._cloud_retry_at = time.monotonic() + _CLOUD_RETRY_SECONDS
         print(f"[{reason}: using local model {self.local_model}]", flush=True)
+        emit("mode", mode="local", model=self.local_model)
+        emit("notice", text=f"{reason[0].upper()}{reason[1:]}: thinking with {self.local_model}.")
         if first_time:
             threading.Thread(target=self._keep_local_ready, args=(warm_up,), daemon=True).start()
 
@@ -182,8 +186,24 @@ class Brain:
             else:
                 os.environ.setdefault("JARVIS_NUM_CTX", _LOCAL_CONTEXT_TOKENS)
                 builder = builder.engine("ollama").model(self.local_model)
-            self._systems[self.mode] = builder.build()
+            system = builder.build()
+            self._forward_tool_events(system)
+            self._systems[self.mode] = system
         return self._systems[self.mode]
+
+    @staticmethod
+    def _forward_tool_events(system) -> None:
+        """Pass the orchestrator's tool calls on to the UI's activity ticker."""
+        from openjarvis.core.events import EventType
+
+        def started(event) -> None:
+            emit("tool", phase="start", tool=event.data.get("tool", ""))
+
+        def finished(event) -> None:
+            emit("tool", phase="end", tool=event.data.get("tool", ""), success=bool(event.data.get("success")))
+
+        system.bus.subscribe(EventType.TOOL_CALL_START, started)
+        system.bus.subscribe(EventType.TOOL_CALL_END, finished)
 
     def _ask_once(self, text: str) -> str:
         # The agent is named explicitly: otherwise OpenJarvis diverts anything
@@ -210,6 +230,8 @@ class Brain:
             if anthropic_reachable():
                 self.mode = "cloud"
                 print("[connection restored: using Claude again]", flush=True)
+                emit("mode", mode="cloud", model="Claude")
+                emit("notice", text="Connection restored: thinking with Claude again.")
             else:
                 self._cloud_retry_at = time.monotonic() + _CLOUD_RETRY_SECONDS
 

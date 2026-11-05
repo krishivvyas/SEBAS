@@ -12,6 +12,29 @@
 
 Built on the **OpenJarvis** agent framework, with **Anthropic Claude** as the reasoning engine and a **local Ollama model** as the fallback when there is no API key or no internet. Listening and speaking always run on your own machine.
 
+![Sebas's desktop interface](docs/sebas-ui.png)
+
+---
+
+## 🖥️ The Interface: "Brass & Hologram"
+
+An Edwardian butler's study inside a holographic HUD: brass and ink-navy with holographic cyan for live data, Art Deco frames, and clockwork rings that double as HUD reticles.
+
+- **Sebas himself**, a cel-shaded butler in the clockwork rings, animated in snappy, hand-drawn style:
+  | State | What he does |
+  |---|---|
+  | At rest | Breathes, blinks at irregular intervals |
+  | Listening | Tilts his head, raises his brows; the cyan halo follows your voice |
+  | Considering | Glances up, glasses glint, the clockwork spins faster |
+  | Speaking | Nods as he begins, pats his chest; four mouth shapes follow his voice, with a gold halo |
+- **The Ledger** (left): the conversation, plus notices such as switching to the local model.
+- **The Household** (right): brass dial gauges for battery, CPU and memory, pending reminders, remembered facts, which mind is in use, and a live microphone meter.
+- **The Service Bell** (bottom): type a request, click a quick action (briefing, workspace, deployments, GitHub, status), or ring the bell to talk without saying "Sebas".
+- **Activity ticker**: lines like *"Consulting the GitHub ledger…"* while tools run.
+- **Extras**: a boot sequence with the crest, synthesised UI sounds (clockwork ticks, a bell; ♪ toggles them), and ambient dust, scanlines and film grain (✦ toggles them).
+
+Voice keeps working while the window is open. Open `sebas_main/ui/index.html` in a browser for a demo without starting Sebas (`?demo=speaking` freezes a state).
+
 ---
 
 ## 🏛️ System Architecture
@@ -75,11 +98,15 @@ sebas/
 ├── README.md
 ├── run.bat                          # One-click Windows launcher
 └── sebas_main/                      # OpenJarvis framework + Sebas
-    ├── run_sebas.py                 # Main loop: voice and text modes
+    ├── run_sebas.py                 # Entry point: interface, voice and text modes
+    ├── ui_app.py                    # Desktop window (pywebview) and its bridge
     ├── sebas_brain.py               # Claude, or a local Ollama model offline
+    ├── sebas_events.py              # Live events from Sebas to the interface
     ├── sebas_bootstrap.py           # Loads .env; one-request API check
     ├── requirements_voice.txt       # Voice pipeline packages
     ├── requirements_tools.txt       # Tool packages (boto3, pycaw)
+    ├── requirements_ui.txt          # Interface package (pywebview)
+    ├── ui/                          # index.html, style.css, app.js, fonts/
     ├── .env.template                # Secrets and settings template
     ├── configs/sebas/
     │   ├── config.toml              # Model, persona, enabled tools
@@ -117,7 +144,7 @@ cd SEBAS\sebas_main
 
 $env:UV_LINK_MODE = "copy"   # recommended inside OneDrive folders
 uv sync --no-dev --extra inference-cloud --python 3.12
-uv pip install python-dotenv -r requirements_voice.txt -r requirements_tools.txt
+uv pip install python-dotenv -r requirements_voice.txt -r requirements_tools.txt -r requirements_ui.txt
 ```
 
 The speech models (about 0.5 GB in total) download automatically on first run.
@@ -165,7 +192,7 @@ Then fill in `.env`. Nothing is strictly required: without `ANTHROPIC_API_KEY` S
    ```
    Stay quiet for 3 seconds, then speak. Put the suggested value in `.env` as `SEBAS_SILENCE_THRESHOLD`.
 
-2. **Talk to Sebas**: double-click `run.bat`, wait for *Ready*, then say:
+2. **Talk to Sebas**: double-click `run.bat`. The interface opens; once the Ledger says *Listening*, say:
    > *"Sebas, rise."* … *"What does my day look like?"*
    >
    > *"Sebas, how are my Vercel deployments?"*
@@ -176,7 +203,16 @@ Then fill in `.env`. Nothing is strictly required: without `ANTHROPIC_API_KEY` S
    >
    > *"Sebas, remember that my main project is the portfolio site."*
 
-3. **Text mode** (quiet rooms, testing): `run.bat --text`
+   Or type in the Service Bell, click a quick action, or ring the bell and just speak.
+
+3. **Other ways to run**:
+   | Command | What it opens |
+   |---|---|
+   | `run.bat` | The interface, with voice |
+   | `run.bat --no-voice` | The interface, typing only (no microphone) |
+   | `run.bat --console` | Voice only, in the console (no interface) |
+   | `run.bat --text` | Typing in the console (quiet rooms, testing) |
+   | `run.bat --mic-test` | Microphone calibration |
 
 4. **API check** (one request, for troubleshooting): `.venv\Scripts\python.exe sebas_bootstrap.py`
 
@@ -220,7 +256,7 @@ The model, persona and enabled tools live in [`sebas_main/configs/sebas/config.t
 
 ## 🧪 Status
 
-Every component has been tested on its own and in a full loop with simulated audio and a simulated API. Offline mode has been tested with the real `qwen2.5` model: starting without a key, starting with Claude unreachable, and losing the connection mid-conversation. Not yet tested with a live Claude API key, a real microphone and voice, real Vercel/GitHub/AWS/Steam accounts, or the Google sign-in.
+Every component has been tested on its own and in a full loop with simulated audio and a simulated API. The interface has been checked in every state through its browser demo. Offline mode has been tested with the real `qwen2.5` model: starting without a key, starting with Claude unreachable, and losing the connection mid-conversation. Not yet tested with a live Claude API key, a real microphone and voice, real Vercel/GitHub/AWS/Steam accounts, or the Google sign-in.
 
 At startup OpenJarvis logs that its optional Rust extension (`openjarvis_rust`) is missing. Sebas does not use the features that need it; memory works through `MEMORY.md` instead.
 
