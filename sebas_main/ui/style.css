@@ -114,7 +114,6 @@ main {
   position: relative; min-height: 0; display: flex; flex-direction: column;
   background: var(--panel); border: 1px solid var(--line);
   box-shadow: inset 0 0 40px rgba(0, 0, 0, 0.45), 0 10px 40px rgba(0, 0, 0, 0.35);
-  backdrop-filter: blur(6px);
 }
 /* Art Deco corner brackets */
 .panel::before, .panel::after {
@@ -173,23 +172,32 @@ body[data-state="speaking"] .ring-mid circle { stroke: var(--brass-hi); opacity:
 .sunburst line { stroke: var(--brass); opacity: 0.11; transition: opacity 0.6s; }
 body[data-state="speaking"] .sunburst line { opacity: 0.22; }
 
-/* The butler: cel-shaded, black outlines, flat fills. Animation is deliberately
-   snappy (stepped poses, not tweens), driven by data attributes from app.js. */
+/* The butler (v2): cel-shaded, black outlines, flat fills. Animation is
+   deliberately snappy (poses swap, nothing tweens), driven by data attributes
+   that app.js sets on #bust. */
 #bust * { stroke-linejoin: round; stroke-linecap: round; }
 #bust .ol { stroke: #101015; stroke-width: 2; }
 #bust .ol-thin { fill: none; stroke: #101015; stroke-width: 1.3; }
 #bust .skin { fill: #f3cfae; }
 #bust .skin-shade { fill: #d9a983; opacity: 0.85; }
+#bust .cheek { fill: none; stroke: #e2a184; stroke-width: 1.6; opacity: 0.6; }
+#bust .ear-in { fill: none; stroke: #c48c68; stroke-width: 1; }
+#bust .nose-hi { fill: none; stroke: #fff3e4; stroke-width: 1.2; opacity: 0.8; }
 #bust .hair { fill: #a8a8b0; }
-#bust .hair-hi { fill: none; stroke: #e2e2e8; stroke-width: 2.2; opacity: 0.9; }
+#bust .hair-back { fill: #8e8e97; }
+#bust .hair-shade { fill: #8b8b94; }
+#bust .hair-hi { fill: none; stroke: #e6e6ec; stroke-width: 2.2; opacity: 0.9; }
 #bust .hair-line { fill: none; stroke: #6e6e78; stroke-width: 1.1; }
 #bust .beard { fill: #b4b4bc; stroke-width: 1; }
+#bust .beard-hi { fill: none; stroke: #d6d6dd; stroke-width: 1.2; }
 #bust .beard-shade { fill: #8c8c96; }
 #bust .moustache { fill: #9d9da6; }
 #bust .crease { fill: none; stroke: #b8835f; stroke-width: 1; opacity: 0.8; }
 #bust .white { fill: #fbf7f0; }
-#bust .iris circle { fill: #4a3426; }
+#bust .iris { fill: #4a3426; }
+#bust .catch { fill: #ffffff; }
 #bust .lid { fill: none; stroke: #101015; stroke-width: 2.1; }
+#bust .lid-lower { fill: none; stroke: #b8835f; stroke-width: 0.9; }
 #bust .brow { fill: none; stroke: #7d7d86; stroke-width: 3.6; }
 #bust .lens { fill: rgba(220, 240, 255, 0.10); stroke: #4a4a52; stroke-width: 1.5; }
 #bust .frame { fill: none; stroke: #4a4a52; stroke-width: 1.5; }
@@ -198,45 +206,78 @@ body[data-state="speaking"] .sunburst line { opacity: 0.22; }
 #bust .teeth { fill: #f6f1e8; }
 #bust .coat { fill: #1b1b21; }
 #bust .coat-hi { fill: none; stroke: #3c3c48; stroke-width: 2; }
+#bust .coat-fold { fill: none; stroke: #0c0c10; stroke-width: 1.4; }
 #bust .lapel { fill: #26262e; }
+#bust .lapel-hi { fill: none; stroke: #4a4a58; stroke-width: 1.4; }
 #bust .waistcoat { fill: #c4c4ca; }
 #bust .waistcoat-shade { fill: #a3a3ab; }
 #bust .shirt { fill: #f7f5f0; }
+#bust .shirt-shade { fill: #d8d6d0; }
 #bust .cravat { fill: #e3e3ea; }
+#bust .cravat-shade { fill: #c9c9d2; }
 #bust .button { fill: #3a3a42; }
+#bust .chain { fill: none; stroke: #d9b45a; stroke-width: 1.6; stroke-dasharray: 2 1.6; }
+#bust .fob { fill: #e8c46a; stroke: #7a5a26; stroke-width: 1; }
+#bust .gem { fill: #5fe3d6; stroke: #2a6e68; stroke-width: 0.8; }
+#bust .sparkle { fill: none; stroke: #ffffff; stroke-width: 1.2; opacity: 0; }
 #bust .napkin { fill: #3d4158; }
+#bust .napkin-hi { fill: none; stroke: #585d7a; stroke-width: 1.6; }
 #bust .napkin-fold { fill: none; stroke: #262a3c; stroke-width: 1.4; }
+#bust .glove { fill: #f4f3ef; }
+#bust .glove-line { fill: none; stroke: #b9b7b0; stroke-width: 1.1; }
 
-/* idle breathing: two poses, no tweening */
-#torso, #hand { animation: breathe 3.2s steps(1) infinite; }
-#head { animation: breathe-head 3.2s steps(1) infinite; transform-box: view-box; transform-origin: 200px 190px; transform-box: view-box; }
+/* every moving part pivots in the 400x400 drawing's own coordinates */
+#figure, #torso, #head, #napkin, #chain, #irises, #brow-l, #brow-r, .arm { transform-box: view-box; }
+#figure { transform-origin: 200px 400px; }
+#head { transform-origin: 200px 190px; }
+#napkin { transform-origin: 300px 352px; }
+#chain { transform-origin: 200px 352px; }
+
+/* idle: breathing and a little sway, in held poses */
+#torso, .arm { animation: breathe 3.2s steps(1) infinite; }
+#head { animation: head-idle 7.5s steps(1) infinite; }
+#napkin { animation: napkin 4.6s steps(1) infinite; }
+#chain { animation: chain 2.8s steps(1) infinite; }
+#pin .sparkle { animation: sparkle 6s steps(1) infinite; }
 @keyframes breathe { 50% { transform: translateY(-1.5px); } }
-@keyframes breathe-head { 50% { transform: translateY(-2px); } }
+@keyframes head-idle { 0% { transform: none; } 30% { transform: translateY(-2px); } 55% { transform: rotate(-1.5deg) translateY(-1px); } 80% { transform: rotate(1deg); } }
+@keyframes napkin { 50% { transform: rotate(1.5deg); } }
+@keyframes chain { 50% { transform: rotate(-3deg); } }
+@keyframes sparkle { 0%, 88% { opacity: 0; } 90%, 95% { opacity: 1; } }
 
 /* mouth frames */
 #bust .mouth { display: none; }
-#bust[data-mouth="0"] .m0, #bust:not([data-mouth]) .m0, #bust[data-mouth="1"] .m1, #bust[data-mouth="2"] .m2, #bust[data-mouth="3"] .m3 { display: inline; }
+#bust[data-mouth="0"] .m0, #bust:not([data-mouth]) .m0, #bust[data-mouth="1"] .m1,
+#bust[data-mouth="2"] .m2, #bust[data-mouth="3"] .m3, #bust[data-mouth="smile"] .msmile { display: inline; }
 
 /* blinking */
 #bust .eyes-closed { display: none; }
 #bust[data-blink] .eyes-open { display: none; }
 #bust[data-blink] .eyes-closed { display: inline; }
 
-/* listening: attentive tilt, raised brows */
+/* arm poses: only the current one is drawn */
+#bust .arm { display: none; }
+#bust[data-pose="chest"] .pose-chest, #bust[data-pose="glasses"] .pose-glasses, #bust[data-pose="present"] .pose-present { display: inline; }
+
+/* brows: the dry-wit arch, and per-state expressions */
+#bust[data-brow="arch"] #brow-r { transform: translateY(-4px) rotate(-4deg); transform-origin: 218px 110px; }
 body[data-state="listening"] #head { animation: none; transform: rotate(-4deg) translateY(-1px); }
-body[data-state="listening"] #bust .brow { transform: translateY(-3px); }
-/* thinking: eyes up, brows knit, glasses glint in snaps */
+body[data-state="listening"] #brow-l, body[data-state="listening"] #brow-r { transform: translateY(-3px); }
 body[data-state="thinking"] #head { animation: ponder 1.6s steps(1) infinite; }
 @keyframes ponder { 0% { transform: rotate(3deg); } 50% { transform: rotate(3deg) translateY(-1px); } }
-body[data-state="thinking"] #bust .iris { transform: translate(2px, -2px); }
-body[data-state="thinking"] #bust .brow { transform: translateY(1px); }
+body[data-state="thinking"] #brow-l { transform: translateY(1px); }
 body[data-state="thinking"] #bust .glint { animation: glint 1.2s steps(1) infinite; }
 @keyframes glint { 0%, 60% { opacity: 0; } 70%, 85% { opacity: 0.95; } }
-/* speaking: brows bob on loud syllables, a nod as he begins, the hand pats the chest */
-#bust[data-emph] .brow { transform: translateY(-2px); }
-#bust[data-nod] #head { animation: none; transform: translateY(5px) rotate(1deg); }
-#bust[data-pat] #hand { animation: none; transform: translateY(-4px); }
 body[data-state="speaking"] #bust .glint { opacity: 0.35; }
+#bust[data-emph] #brow-l, #bust[data-emph] #brow-r { transform: translateY(-2px); }
+
+/* gestures */
+#bust[data-nod] #head { animation: none; transform: translateY(5px) rotate(1deg); }
+#bust[data-gesture="bow"] #figure { transform: translateY(10px) rotate(4deg); }
+#bust[data-gesture="bow"] #head { animation: none; transform: translateY(12px) rotate(3deg); }
+#bust[data-gesture="bow"] .eyes-open { display: none; }
+#bust[data-gesture="bow"] .eyes-closed { display: inline; }
+
 
 .holo-layer { opacity: 0.35; }
 .holo-scan { animation: scanmove 6s linear infinite; }
@@ -353,3 +394,77 @@ body[data-state="listening"] #bell { box-shadow: 0 0 0 4px rgba(95, 227, 214, 0.
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation-duration: 0.001s !important; animation-iteration-count: 1 !important; }
 }
+
+/* Household: accounts */
+.accounts { display: grid; grid-template-columns: auto 1fr auto 1fr; gap: 4px 10px; align-items: baseline; font-family: var(--mono); font-size: 10px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--ivory-dim); }
+.accounts b { font-family: var(--serif); font-size: 18px; letter-spacing: 0; text-transform: none; color: var(--brass-hi); font-weight: 600; }
+.list li.overdue .when { color: var(--ruby); }
+
+/* Farewell, when Sebas is sent to sleep */
+#farewell { position: fixed; inset: 0; z-index: 101; display: grid; place-items: center; align-content: center; gap: 16px;
+  background: radial-gradient(ellipse at center, rgba(13, 21, 40, 0.92) 0%, rgba(5, 7, 13, 0.98) 70%); opacity: 0; visibility: hidden; transition: opacity 1.2s ease 0.4s, visibility 1.2s 0.4s; }
+#farewell.on { opacity: 1; visibility: visible; }
+.farewell-crest { width: 120px; height: 120px; display: grid; place-items: center; transform: rotate(45deg); border: 2px solid var(--brass);
+  font-family: var(--display); font-weight: 700; font-size: 48px; color: var(--brass-hi); box-shadow: 0 0 30px rgba(201, 164, 92, 0.35); }
+.farewell-crest span { transform: rotate(-45deg); }
+#farewell .boot-sub { opacity: 1; animation: none; }
+
+/* ===================== Anime Easter eggs ===================== */
+
+/* Black Butler: crimson eyes with demonic slit pupils */
+#bust .demon, #bust .sharingan, #bust .tian-beard, #bust .tian-beard-line { display: none; }
+body[data-egg="butler"] #bust .iris { fill: #c2185b; }
+body[data-egg="butler"] #bust .demon { display: inline; fill: #12020a; }
+body[data-egg="butler"] #bust .white { fill: #ffe9ef; }
+body[data-egg="butler"] #avatar { filter: drop-shadow(0 0 18px rgba(194, 24, 91, 0.45)); }
+
+/* Sharingan: red eyes with spinning tomoe */
+body[data-egg="sharingan"] #bust #irises { display: none; }
+body[data-egg="sharingan"] #bust .sharingan { display: inline; }
+#bust .sh-iris { fill: #d11a1a; stroke: #2a0000; stroke-width: 0.5; }
+#bust .sh-ring { fill: none; stroke: #2a0000; stroke-width: 0.35; }
+#bust .sh-pupil, #bust .tomoe circle { fill: #120000; }
+#bust .tomoe { transform-box: fill-box; transform-origin: center; animation: tomoe 0.9s linear infinite; }
+@keyframes tomoe { to { transform: rotate(360deg); } }
+
+/* Konami code: Sebas Tian's look (Overlord): full white beard, no glasses, stern brow */
+#bust[data-costume="tian"] .tian-beard { display: inline; fill: #eef0f4; stroke: #101015; stroke-width: 1.4; }
+#bust[data-costume="tian"] .tian-beard-line { display: inline; fill: none; stroke: #b9bcc6; stroke-width: 1.2; }
+#bust[data-costume="tian"] .glasses { display: none; }
+#bust[data-costume="tian"] .hair { fill: #e8e9ee; }
+#bust[data-costume="tian"] .hair-shade { fill: #c9cbd3; }
+#bust[data-costume="tian"] .hair-line { stroke: #a3a6b0; }
+#bust[data-costume="tian"] .moustache { fill: #f5f6f8; }
+#bust[data-costume="tian"] .brow { stroke: #f2f3f6; stroke-width: 4.2; }
+#bust[data-costume="tian"] #brow-l { transform: rotate(9deg); transform-origin: 192px 112px; }
+#bust[data-costume="tian"] #brow-r { transform: rotate(-9deg); transform-origin: 208px 112px; }
+#bust[data-costume="tian"] .iris { fill: #2f3d66; }
+
+/* Nazarick mode: crimson and black, the Supreme One's sigil */
+.nazarick-sigil { display: none; stroke: #e0284a; stroke-width: 1.4; opacity: 0.5; transform-box: view-box; transform-origin: 200px 200px; animation: spin 90s linear infinite reverse; }
+body.nazarick { --brass: #c8243f; --brass-hi: #ff5a74; --brass-lo: #6e0f1e; --holo: #b26bff; --holo-dim: rgba(178, 107, 255, 0.35); --line: rgba(200, 36, 63, 0.4); }
+body.nazarick { background: radial-gradient(ellipse 70% 60% at 50% 42%, rgba(120, 10, 30, 0.45), transparent 70%), #050003; }
+body.nazarick .nazarick-sigil { display: inline; }
+body.nazarick .panel { background: linear-gradient(180deg, rgba(40, 6, 14, 0.82), rgba(10, 2, 5, 0.9)); }
+body.nazarick .sunburst line { stroke: #c8243f; }
+body.nazarick #bust .gem { fill: #ff2e55; }
+
+/* DBZ power level: gauges over the limit, shaking and cracked */
+.dial .crack { display: none; stroke: #f6e2a4; stroke-width: 0.9; fill: none; }
+body[data-egg="power"] .dial .crack { display: inline; }
+body[data-egg="power"] .dial svg { animation: shake 0.12s steps(2) infinite; }
+body[data-egg="power"] .dial .value { color: var(--ruby); font-weight: 600; }
+body[data-egg="power"] .avatar-wrap { animation: shake 0.16s steps(2) 6; }
+@keyframes shake { 0% { transform: translate(1px, -1px); } 50% { transform: translate(-1px, 1px); } }
+
+/* Steins;Gate divergence meter */
+#divergence { position: fixed; inset: 0; z-index: 90; display: grid; place-items: center; align-content: center; gap: 16px;
+  background: radial-gradient(ellipse at center, rgba(20, 8, 0, 0.88), rgba(5, 2, 0, 0.94) 70%); opacity: 0; visibility: hidden; transition: opacity 0.4s, visibility 0.4s; }
+#divergence.on { opacity: 1; visibility: visible; }
+#divergence .tubes { display: flex; gap: 10px; }
+#divergence .tube { width: 66px; height: 118px; border-radius: 30px 30px 10px 10px; display: grid; place-items: center;
+  background: radial-gradient(ellipse at 50% 40%, rgba(255, 140, 40, 0.12), rgba(20, 10, 5, 0.9) 70%), repeating-linear-gradient(0deg, rgba(255,160,80,.05) 0 2px, transparent 2px 6px);
+  border: 1px solid rgba(255, 170, 90, 0.35); box-shadow: inset 0 0 18px rgba(0, 0, 0, 0.8), 0 0 12px rgba(255, 120, 30, 0.15);
+  font-family: var(--mono); font-size: 64px; color: #ff9a3c; text-shadow: 0 0 8px #ff7b00, 0 0 22px #ff5a00; }
+#divergence .tube.dot { width: 30px; font-size: 54px; }
+#divergence .dm-caption { font-family: var(--mono); font-size: 12px; letter-spacing: 0.35em; text-transform: uppercase; color: rgba(255, 170, 90, 0.75); }

@@ -138,6 +138,13 @@ def _open_workspace(project: str) -> str:
     if site := ws.get("website", ""):
         open_url(str(_lookup("websites", site)))
         opened += f" and {site} in the browser"
+    if ws.get("music"):
+        # Spotify takes a few seconds to start; resume the music without making
+        # the user wait for it.
+        from custom_tools.media_system import resume_spotify
+
+        threading.Thread(target=resume_spotify, daemon=True).start()
+        opened += ", and Spotify is starting to resume your music"
     return opened + "." + note
 
 
@@ -170,6 +177,7 @@ class _ChoiceTool(SebasTool):
 @ToolRegistry.register("open_app")
 class OpenAppTool(_ChoiceTool):
     name = "open_app"
+    acts_on_laptop = True
     description = "Open an application from the user's approved list."
     section = "apps"
     argument_description = "Name of the application."
@@ -179,6 +187,7 @@ class OpenAppTool(_ChoiceTool):
 @ToolRegistry.register("open_website")
 class OpenWebsiteTool(_ChoiceTool):
     name = "open_website"
+    acts_on_laptop = True
     description = "Open a website from the user's approved list in the default browser."
     section = "websites"
     argument_description = "Name of the website."
@@ -188,6 +197,7 @@ class OpenWebsiteTool(_ChoiceTool):
 @ToolRegistry.register("open_workspace")
 class OpenWorkspaceTool(_ChoiceTool):
     name = "open_workspace"
+    acts_on_laptop = True
     description = (
         "Open a project folder in the user's editor (Antigravity), start the "
         "configured command in its terminal, and open the configured website. "
@@ -218,6 +228,7 @@ def _run_shortcut(name: str) -> str:
 @ToolRegistry.register("run_shortcut")
 class RunShortcutTool(_ChoiceTool):
     name = "run_shortcut"
+    acts_on_laptop = True
     description = "Run one of the user's named routines, which open several things at once."
     section = "shortcuts"
     argument_description = "Name of the routine."
@@ -269,6 +280,7 @@ def get_volume() -> tuple[int, bool]:
 @ToolRegistry.register("set_volume")
 class SetVolumeTool(SebasTool):
     name = "set_volume"
+    acts_on_laptop = True
     description = "Set the speaker volume (0-100), mute, unmute, or report the current level."
     parameters = {
         "type": "object",
@@ -291,6 +303,7 @@ class SetVolumeTool(SebasTool):
 @ToolRegistry.register("lock_screen")
 class LockScreenTool(SebasTool):
     name = "lock_screen"
+    acts_on_laptop = True
     description = "Lock the laptop's screen."
 
     def run(self) -> str:

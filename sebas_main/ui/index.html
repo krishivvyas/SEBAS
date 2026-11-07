@@ -34,6 +34,12 @@
   <div class="boot-sub">At your service.</div>
 </div>
 
+<!-- Farewell, when Sebas is sent to sleep -->
+<div id="farewell" aria-hidden="true"><div class="farewell-crest"><span>S</span></div><div class="boot-sub">Rest well, sir.</div></div>
+
+<!-- Steins;Gate divergence meter -->
+<div id="divergence" aria-hidden="true"><div class="tubes"></div><div class="dm-caption">Worldline divergence · El Psy Kongroo</div></div>
+
 <!-- Title bar -->
 <header class="titlebar">
   <div class="drag pywebview-drag-region">
@@ -115,6 +121,13 @@
           </filter>
         </defs>
 
+        <!-- Nazarick mode: an original sigil, shown only in that mode -->
+        <g class="nazarick-sigil" fill="none">
+          <circle cx="200" cy="200" r="150"/><circle cx="200" cy="200" r="138"/>
+          <path d="M200 62 L330 245 L70 245 Z M200 338 L70 155 L330 155 Z"/>
+          <circle cx="200" cy="200" r="58"/>
+          <path d="M200 62 L200 338 M62 200 L338 200"/>
+        </g>
         <!-- Art Deco sunburst and clockwork rings (ticks and teeth are added by app.js) -->
         <g class="sunburst" id="sunburst"></g>
         <circle cx="200" cy="200" r="188" fill="none" stroke="#c9a45c" stroke-opacity="0.35" stroke-width="0.8"/>
@@ -132,74 +145,107 @@
           <line x1="4" y1="200" x2="20" y2="200"/><line x1="380" y1="200" x2="396" y2="200"/>
         </g>
 
-        <!-- The butler: cel-shaded, after the reference portrait. Animated by app.js
-             through data attributes: data-mouth (0-3), data-blink, data-nod, data-pat. -->
-        <g id="bust" filter="url(#rimLight)">
+        <!-- The butler (v2): cel-shaded, after the reference portrait, built from
+             separately animated parts. app.js drives it through data attributes on
+             #bust: data-mouth (0-3, smile), data-blink, data-pose (chest | glasses |
+             present), data-gesture (bow), data-brow (arch). -->
+        <g id="bust" filter="url(#rimLight)" data-pose="chest">
+          <g id="figure">
           <g id="torso">
             <!-- waistcoat and shirt (seen through the open coat) -->
             <path class="ol waistcoat" d="M166 250 L200 266 L234 250 L250 400 L150 400 Z"/>
             <path class="waistcoat-shade" d="M166 250 L184 258 L194 400 L150 400 Z"/>
             <path class="ol shirt" d="M176 256 L200 268 L224 256 L214 300 L200 332 L186 300 Z"/>
-            <path class="ol-thin" d="M186 300 L200 332 L214 300"/>
+            <path class="shirt-shade" d="M176 256 L200 268 L196 280 L186 274 Z"/>
             <circle class="button" cx="200" cy="350" r="2.8"/><circle class="button" cx="200" cy="374" r="2.8"/><circle class="button" cx="200" cy="398" r="2.8"/>
-            <!-- cravat -->
+            <!-- pocket-watch chain, swinging -->
+            <g id="chain"><path class="chain" d="M200 352 Q214 370 234 362"/><circle class="fob" cx="235" cy="362" r="3.2"/></g>
+            <!-- cravat with a pin -->
             <path class="ol cravat" d="M195 284 L205 284 L213 318 L200 336 L187 318 Z"/>
-            <path class="ol-thin" d="M200 288 L198 330" opacity="0.5"/>
+            <path class="cravat-shade" d="M200 286 L205 284 L213 318 L200 336 Z"/>
             <path class="ol cravat" d="M191 271 L209 271 L206 285 L194 285 Z"/>
+            <g id="pin"><circle class="gem" cx="200" cy="298" r="2.4"/><path class="sparkle" d="M200 292 L200 304 M194 298 L206 298"/></g>
             <!-- black tailcoat, open at the front -->
             <path class="ol coat" d="M60 400 L66 330 C72 300 96 284 132 272 L170 250 L186 400 Z"/>
             <path class="ol coat" d="M340 400 L334 330 C328 300 304 284 268 272 L230 250 L214 400 Z"/>
-            <path class="coat-hi" d="M88 300 C100 290 116 282 132 276" />
-            <path class="coat-hi" d="M312 300 C300 290 284 282 268 276" />
+            <path class="coat-hi" d="M84 304 C98 290 116 282 132 276"/>
+            <path class="coat-hi" d="M316 304 C302 290 284 282 268 276"/>
+            <path class="coat-fold" d="M118 300 C126 330 130 360 128 400 M282 300 C274 330 270 360 272 400"/>
             <!-- notched lapels -->
             <path class="ol lapel" d="M170 250 L186 264 L182 278 L172 281 L182 362 L174 364 L142 292 L148 270 Z"/>
             <path class="ol lapel" d="M230 250 L214 264 L218 278 L228 281 L218 362 L226 364 L258 292 L252 270 Z"/>
+            <path class="lapel-hi" d="M150 274 L172 282 M250 274 L228 282"/>
             <!-- pocket square -->
             <path class="ol-thin" d="M270 304 L304 296"/>
             <path class="ol shirt" d="M274 302 L298 294 L296 286 L286 292 L278 288 Z"/>
             <!-- wing collar -->
             <path class="ol shirt" d="M178 240 L198 266 L184 274 L170 256 Z"/>
             <path class="ol shirt" d="M222 240 L202 266 L216 274 L230 256 Z"/>
-            <!-- napkin draped over the arm -->
+          </g>
+
+          <!-- napkin over the left arm, swaying -->
+          <g id="napkin">
             <path class="ol napkin" d="M262 352 C284 344 314 348 330 364 L344 400 L254 400 C258 384 258 366 262 352 Z"/>
+            <path class="napkin-hi" d="M268 356 C284 350 304 352 318 362"/>
             <path class="napkin-fold" d="M280 356 C290 372 292 386 290 400 M306 356 C312 370 316 384 318 400"/>
           </g>
 
           <!-- neck -->
           <path class="ol skin" d="M185 220 L185 250 Q200 258 215 250 L215 220 Z"/>
-          <path class="skin-shade" d="M185 224 L215 224 L215 236 Q200 246 185 236 Z"/>
+          <path class="skin-shade" d="M185 224 L215 224 L215 238 Q200 248 185 238 Z"/>
 
           <g transform="translate(0 40)">
           <g id="head">
+            <!-- hair at the back, behind the ears -->
+            <path class="ol hair-back" d="M157 106 C154 120 156 132 160 140 L164 112 Z M243 106 C246 120 244 132 240 140 L236 112 Z"/>
             <!-- ears -->
             <path class="ol skin" d="M161 116 C152 112 149 132 155 142 C157 147 162 147 164 143 Z"/>
             <path class="ol skin" d="M239 116 C248 112 251 132 245 142 C243 147 238 147 236 143 Z"/>
+            <path class="ear-in" d="M157 124 C155 130 156 136 159 139 M243 124 C245 130 244 136 241 139"/>
             <!-- face -->
             <path class="ol skin" d="M160 104 C160 90 174 82 200 82 C226 82 240 90 240 104 L240 132 C240 154 232 170 220 182 C212 190 206 194 200 194 C194 194 188 190 180 182 C168 170 160 154 160 132 Z"/>
+            <path class="skin-shade" d="M160 110 C162 124 164 136 168 146 C164 132 162 120 162 108 Z"/>
+            <path class="cheek" d="M170 146 Q176 150 182 148 M218 148 Q224 150 230 146"/>
             <!-- trimmed beard and goatee -->
             <path class="ol-thin beard" d="M161 128 C162 152 170 170 182 182 C190 190 196 196 200 196 C204 196 210 190 218 182 C230 170 238 152 239 128 L236 130 C234 148 228 160 218 166 C212 158 206 157 200 157 C194 157 188 158 182 166 C172 160 166 148 164 130 Z"/>
+            <path class="beard-hi" d="M168 150 C172 162 178 170 184 176 M232 150 C228 162 222 170 216 176 M196 186 Q200 189 204 186"/>
             <path class="beard-shade" d="M190 184 C196 190 204 190 210 184 C206 192 194 192 190 184 Z"/>
+            <path class="ol-thin tian-beard" d="M158 118 C158 150 168 182 186 200 C192 207 196 213 200 216 C204 213 208 207 214 200 C232 182 242 150 242 118 L236 122 C236 148 228 162 218 168 C212 160 206 158 200 158 C194 158 188 160 182 168 C172 162 164 148 164 122 Z"/>
+            <path class="tian-beard-line" d="M176 182 C184 194 192 204 200 210 C208 204 216 194 224 182 M188 196 L192 206 M212 196 L208 206"/>
             <!-- moustache -->
             <path class="ol-thin moustache" d="M181 161 C187 154 196 154 200 158 C204 154 213 154 219 161 C213 165 206 163 200 161 C194 163 187 165 181 161 Z"/>
-            <!-- mouth: four frames, chosen by data-mouth -->
+            <!-- mouth frames -->
             <g class="mouth m0"><path class="ol-thin" d="M191 169 Q200 171 209 169"/></g>
             <g class="mouth m1"><path class="mouth-in" d="M192 168 Q200 167 208 168 Q200 174 192 168 Z"/></g>
             <g class="mouth m2"><path class="mouth-in" d="M191 167 Q200 165 209 167 Q206 177 200 177 Q194 177 191 167 Z"/><path class="teeth" d="M193 167.5 Q200 166 207 167.5 L206 170 Q200 169 194 170 Z"/></g>
             <g class="mouth m3"><path class="mouth-in" d="M190 166 Q200 163 210 166 Q208 182 200 182 Q192 182 190 166 Z"/><path class="teeth" d="M192 166.5 Q200 164.5 208 166.5 L207 169.5 Q200 168 193 169.5 Z"/></g>
+            <g class="mouth msmile"><path class="ol-thin" d="M189 167 Q200 175 211 167"/></g>
             <!-- nose and age lines -->
             <path class="ol-thin" d="M201 126 L196 146 Q200 149 205 147"/>
-            <path class="crease" d="M187 146 Q182 154 184 162 M213 146 Q218 154 216 162 M180 94 Q200 90 220 94 M186 100 Q200 97 214 100"/>
-            <!-- eyes: open and closed frames -->
+            <path class="nose-hi" d="M203 130 L201 142"/>
+            <path class="crease" d="M187 146 Q182 154 184 162 M213 146 Q218 154 216 162 M180 94 Q200 90 220 94 M186 100 Q200 97 214 100 M170 132 Q173 135 176 134 M224 134 Q227 135 230 132"/>
+            <!-- eyes: whites, moving irises with a catch-light, lids -->
             <g class="eyes-open">
               <path class="white" d="M173 125 Q182 119 191 125 Q182 129 173 125 Z"/>
               <path class="white" d="M209 125 Q218 119 227 125 Q218 129 209 125 Z"/>
-              <g class="iris"><circle cx="182" cy="125" r="3.3"/><circle cx="218" cy="125" r="3.3"/></g>
+              <g id="irises">
+                <circle class="iris" cx="182" cy="125" r="3.4"/><circle class="iris" cx="218" cy="125" r="3.4"/>
+                <circle class="catch" cx="183.2" cy="123.8" r="1"/><circle class="catch" cx="219.2" cy="123.8" r="1"/>
+              </g>
+              <g class="demon"><ellipse cx="182" cy="125" rx="0.9" ry="3"/><ellipse cx="218" cy="125" rx="0.9" ry="3"/></g>
+              <g class="sharingan">
+                <g class="sharingan-eye"><circle class="sh-iris" cx="182" cy="125" r="3.6"/><circle class="sh-ring" cx="182" cy="125" r="2.3"/><circle class="sh-pupil" cx="182" cy="125" r="0.9"/>
+                  <g class="tomoe"><circle cx="182" cy="122.7" r="0.75"/><circle cx="184" cy="126.2" r="0.75"/><circle cx="180" cy="126.2" r="0.75"/></g></g>
+                <g class="sharingan-eye"><circle class="sh-iris" cx="218" cy="125" r="3.6"/><circle class="sh-ring" cx="218" cy="125" r="2.3"/><circle class="sh-pupil" cx="218" cy="125" r="0.9"/>
+                  <g class="tomoe"><circle cx="218" cy="122.7" r="0.75"/><circle cx="220" cy="126.2" r="0.75"/><circle cx="216" cy="126.2" r="0.75"/></g></g>
+              </g>
               <path class="lid" d="M172 125 Q182 117 192 124 M208 124 Q218 117 228 125"/>
+              <path class="lid-lower" d="M175 127 Q182 129.5 189 127 M211 127 Q218 129.5 225 127"/>
             </g>
             <path class="eyes-closed lid" d="M172 125 Q182 129 192 125 M208 125 Q218 129 228 125"/>
-            <!-- brows -->
-            <path class="brow" d="M169 114 Q181 107 194 111"/>
-            <path class="brow" d="M206 111 Q219 107 231 114"/>
+            <!-- brows, separately movable -->
+            <path id="brow-l" class="brow" d="M169 114 Q181 107 194 111"/>
+            <path id="brow-r" class="brow" d="M206 111 Q219 107 231 114"/>
             <!-- rectangular wire glasses -->
             <g class="glasses">
               <rect class="lens" x="168" y="115" width="28" height="18" rx="4"/>
@@ -209,19 +255,37 @@
             </g>
             <!-- swept-back silver hair -->
             <path class="ol hair" d="M157 120 C150 92 162 64 196 59 C228 55 249 72 246 104 L242 122 C241 106 237 96 231 91 C221 84 207 82 197 83 C181 84 169 90 165 100 C161 107 160 113 159 122 Z"/>
+            <path class="hair-shade" d="M160 116 C156 96 164 76 184 66 C170 78 164 94 164 110 Z"/>
             <path class="hair-hi" d="M170 80 Q194 66 226 70 M166 94 Q190 78 234 86 M178 70 Q200 61 222 63"/>
-            <path class="hair-line" d="M172 88 Q196 74 236 80 M162 104 Q170 86 196 79 M240 100 Q238 84 224 76"/>
+            <path class="hair-line" d="M172 88 Q196 74 236 80 M162 104 Q170 86 196 79 M240 100 Q238 84 224 76 M190 66 Q210 62 230 70"/>
           </g>
           </g>
 
-          <!-- the right hand, resting on the heart -->
-          <g id="hand">
+          <!-- right arm: three poses, one shown at a time (data-pose) -->
+          <g class="arm pose-chest">
             <path class="ol coat" d="M92 400 C108 372 150 344 190 324 L204 344 C170 362 140 382 130 400 Z"/>
+            <path class="coat-hi" d="M112 384 C136 366 160 350 184 338"/>
             <path class="ol shirt" d="M188 322 L203 316 L212 338 L198 345 Z"/>
             <g transform="rotate(-24 204 330)">
-            <path class="ol skin" d="M203 318 C214 306 236 300 258 301 C267 302 268 310 260 313 L242 316 C254 316 267 318 269 324 C270 331 259 331 251 330 C259 333 261 339 253 341 L233 341 C225 345 214 345 208 341 Z"/>
-            <path class="ol-thin" d="M242 316 L230 318 M251 330 L234 330 M222 312 C226 303 232 298 239 297"/>
+              <path class="ol glove" d="M203 318 C214 306 236 300 258 301 C267 302 268 310 260 313 L242 316 C254 316 267 318 269 324 C270 331 259 331 251 330 C259 333 261 339 253 341 L233 341 C225 345 214 345 208 341 Z"/>
+              <path class="glove-line" d="M242 316 L230 318 M251 330 L234 330 M222 312 C226 303 232 298 239 297 M214 336 L232 335"/>
             </g>
+          </g>
+          <g class="arm pose-glasses">
+            <path class="ol coat" d="M84 400 C94 352 118 304 148 262 L164 238 L188 248 L174 272 C148 318 128 362 122 400 Z"/>
+            <path class="coat-hi" d="M104 380 C116 342 134 306 156 272"/>
+            <path class="ol shirt" d="M162 236 L172 220 L192 230 L184 248 Z"/>
+            <path class="ol glove" d="M174 222 C168 212 168 200 176 194 L188 191 C197 193 199 203 196 213 C193 221 184 226 174 222 Z"/>
+            <path class="ol glove" d="M186 195 L196 165 C197 161 202 162 201 166 L194 197 Z"/>
+            <path class="glove-line" d="M175 204 L193 201 M175 212 L191 210"/>
+          </g>
+          <g class="arm pose-present">
+            <path class="ol coat" d="M90 400 C96 372 112 346 134 328 L154 346 C138 360 128 380 124 400 Z"/>
+            <path class="coat-hi" d="M104 386 C112 366 124 350 136 340"/>
+            <path class="ol shirt" d="M128 324 L142 314 L156 330 L144 342 Z"/>
+            <path class="ol glove" d="M132 318 C124 306 112 296 98 292 C92 291 90 297 96 300 L110 306 C98 302 86 302 82 307 C79 312 86 314 92 313 C86 316 84 322 90 323 L106 320 C112 326 122 330 130 328 Z"/>
+            <path class="glove-line" d="M110 306 L120 310 M92 313 L112 314 M106 320 L118 320"/>
+          </g>
           </g>
 
           <!-- hologram overlays -->
@@ -243,6 +307,12 @@
     <h2 class="panel-title"><span>The Household</span></h2>
     <div class="body">
       <div class="dials" id="dials"></div>
+
+      <h3 class="sub">The Agenda</h3>
+      <ul class="list" id="agenda"><li class="empty">The agenda is clear.</li></ul>
+
+      <h3 class="sub">Accounts</h3>
+      <div class="accounts"><span>Today</span><b id="spent-today">₹0</b><span>This month</span><b id="spent-month">₹0</b></div>
 
       <h3 class="sub">Engagements</h3>
       <ul class="list" id="reminders"><li class="empty">No engagements pending.</li></ul>

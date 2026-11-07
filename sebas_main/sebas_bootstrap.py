@@ -3,7 +3,7 @@
 OpenJarvis reads credentials from os.environ and has no .env support of its own,
 and it resolves some paths at import time, so the order matters.
 
-Run directly to send one real request through the orchestrator (uses API credit):
+Run directly to send one real request through the provider chain (uses API quota):
 
     .venv\\Scripts\\python.exe sebas_bootstrap.py
 """
@@ -29,20 +29,15 @@ def load_env() -> None:
 
 def main() -> int:
     load_env()
-    if not os.environ.get("ANTHROPIC_API_KEY"):
-        print("ANTHROPIC_API_KEY is not set. Copy .env.template to .env and fill it in.")
-        return 1
+    from sebas_brain import Brain
 
-    from openjarvis import Jarvis
-
-    with Jarvis() as jarvis:
-        result = jarvis.ask_full(
-            "What is 2 + 2? Use the calculator tool, then reply in one short sentence.",
-            agent="orchestrator",
-            tools=["calculator"],
-        )
-    print(f"engine: {result.get('engine')}  model: {result.get('model')}")
-    print(f"reply:  {result['content']}")
+    brain = Brain()
+    try:
+        reply = brain.ask("How is my laptop doing? Use the system_status tool, then answer in one sentence.")
+        print(f"answered by: {brain.description}")
+        print(f"reply:       {reply}")
+    finally:
+        brain.close()
     return 0
 
 

@@ -18,18 +18,23 @@ from __future__ import annotations
 import logging
 from typing import Any, Callable
 
-_sink: Callable[[str, dict[str, Any]], None] | None = None
+Sink = Callable[[str, dict[str, Any]], None]
+_sink: Sink | None = None          # the interface, if one is open
+_listeners: list[Sink] = []        # anything else that wants a copy (Discord)
 
 
-def set_sink(sink: Callable[[str, dict[str, Any]], None] | None) -> None:
+def set_sink(sink: Sink | None) -> None:
     global _sink
     _sink = sink
 
 
+def add_listener(listener: Sink) -> None:
+    _listeners.append(listener)
+
+
 def emit(kind: str, **data: Any) -> None:
-    if _sink is None:
-        return
-    try:
-        _sink(kind, data)
-    except Exception:  # a display problem must never break Sebas himself
-        logging.getLogger(__name__).debug("Event sink failed", exc_info=True)
+    for target in ([_sink] if _sink else []) + _listeners:
+        try:
+            target(kind, data)
+        except Exception:  # a display problem must never break Sebas himself
+            logging.getLogger(__name__).debug("Event sink failed", exc_info=True)

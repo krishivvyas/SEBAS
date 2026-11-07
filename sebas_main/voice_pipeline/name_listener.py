@@ -35,6 +35,7 @@ _PRE_ROLL_FRAMES = 4  # keep 320 ms before speech starts, so the "S" is not clip
 _END_SILENCE_FRAMES = 9  # 720 ms of quiet ends an utterance
 _MIN_SPEECH_FRAMES = 4
 _MAX_FRAMES = int(15 * _RATE / _FRAME)
+_NAME_CHECK_SECONDS = 3
 
 
 def _norm(word: str) -> str:
@@ -74,6 +75,26 @@ def is_summon(remainder: str) -> bool:
     return len(words) == 1 and any(
         SequenceMatcher(None, words[0], w).ratio() >= 0.5 for w in ("rise", "arise")
     )
+
+
+SLEEP_PHRASES = {
+    "sleep", "go to sleep", "goodnight", "good night", "rest", "go rest", "retire",
+    "shut down", "shutdown", "turn off", "power down", "that will be all", "thats all",
+    "dismissed", "you may go", "you may retire", "sleep now", "go to bed",
+}
+
+
+def is_sleep_request(text: str) -> bool:
+    """True for "sleep" / "good night" / "that will be all" said on its own.
+
+    Only the whole request counts, so "turn off the wifi" is not mistaken for
+    sending Sebas to sleep. A leading "Sebas," and politeness are ignored.
+    """
+    words = re.sub(r"[^a-z ]", "", text.lower()).split()
+    if words and _is_name(words[0]):
+        words = words[1:]
+    words = [w for w in words if w not in {"please", "now", "sebas", "ok", "okay", "you", "can"}] or words
+    return " ".join(words) in SLEEP_PHRASES
 
 
 def request_text(remainder: str) -> str:
@@ -138,7 +159,9 @@ class NameListener:
                     pcm = self.next_utterance(stream)
                 except PushToTalk:
                     return None, ""
-                text = self._ears.transcribe(pcm)
+                # "Sebas" always comes first, so only the opening seconds need
+                # checking: long background speech (TV, a call) costs far less.
+                text = self._ears.transcribe(pcm[: _RATE * _NAME_CHECK_SECONDS])
                 remainder = split_address(text)
                 if remainder is not None:
                     return pcm, remainder

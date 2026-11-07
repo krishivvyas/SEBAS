@@ -54,22 +54,67 @@ const Sound = {
 };
 
 /* ---------------- Ambient dust ---------------- */
+/* The ambient layer follows the seasons: sakura in spring, fireflies on summer
+   nights, falling leaves in autumn, snow in winter, golden dust otherwise.
+   ?season=spring|summer-night|autumn|winter|dust overrides it. */
+function currentSeason() {
+  const forced = params.get("season"); if (forced) return forced;
+  const now = new Date(), m = now.getMonth() + 1, h = now.getHours();
+  if (m === 12 || m <= 2) return "winter";
+  if (m <= 5) return "spring";
+  if (m <= 8) return h >= 18 || h < 6 ? "summer-night" : "dust";
+  return "autumn";
+}
+const LEAF_COLOURS = ["#d9822b", "#b5501f", "#e0a83a", "#8c3b1d", "#c96a2c"];
+function makeMote(kind, w, h, anywhere) {
+  const d = devicePixelRatio, r = Math.random;
+  const m = { x: r() * w, y: anywhere ? r() * h : -10 * d, p: r() * 6.28, a: r() * 6.28, spin: (r() - 0.5) * 0.06 };
+  if (kind === "winter") Object.assign(m, { r: (r() * 1.6 + 0.8) * d, vy: (r() * 0.7 + 0.5) * d, vx: 0 });
+  else if (kind === "spring") Object.assign(m, { r: (r() * 2 + 3) * d, vy: (r() * 0.5 + 0.45) * d, vx: (r() * 0.4 + 0.25) * d, c: r() < 0.5 ? "#f7b6c8" : "#ffd6e2" });
+  else if (kind === "autumn") Object.assign(m, { r: (r() * 2.5 + 3.5) * d, vy: (r() * 0.6 + 0.55) * d, vx: (r() - 0.3) * 0.4 * d, c: LEAF_COLOURS[Math.floor(r() * LEAF_COLOURS.length)] });
+  else if (kind === "summer-night") Object.assign(m, { y: r() * h, r: (r() * 1.4 + 1.2) * d, vy: 0, vx: 0 });
+  else Object.assign(m, { y: anywhere ? r() * h : h + 5, r: (r() * 1.4 + 0.3) * d, vy: -(r() * 0.25 + 0.05) * d, vx: 0, gold: r() < 0.75 });
+  return m;
+}
 function startDust() {
-  const c = $("#dust"), g = c.getContext("2d"); let motes = [];
+  const c = $("#dust"), g = c.getContext("2d"), kind = currentSeason();
+  document.body.dataset.season = kind;
+  const count = { "summer-night": 26, spring: 40, autumn: 34, winter: 60, dust: 70 }[kind] || 60;
+  let motes = [];
   const size = () => {
     c.width = innerWidth * devicePixelRatio; c.height = innerHeight * devicePixelRatio;
-    motes = Array.from({ length: 70 }, () => ({ x: Math.random() * c.width, y: Math.random() * c.height,
-      r: (Math.random() * 1.4 + 0.3) * devicePixelRatio, v: Math.random() * 0.25 + 0.05, p: Math.random() * 6.28, gold: Math.random() < 0.75 }));
+    motes = Array.from({ length: count }, () => makeMote(kind, c.width, c.height, true));
   };
   size(); addEventListener("resize", size);
+  let lastDust = 0;
   (function frame(t) {
-    if (document.body.dataset.ambient !== "off") {
+    // 30 fps is plenty for drifting particles; nothing is drawn while hidden or minimised
+    if (document.body.dataset.ambient !== "off" && !document.hidden && t - lastDust > 33) {
+      lastDust = t;
       g.clearRect(0, 0, c.width, c.height);
-      for (const m of motes) {
-        m.y -= m.v * devicePixelRatio; m.x += Math.sin(t / 3000 + m.p) * 0.15;
-        if (m.y < -5) { m.y = c.height + 5; m.x = Math.random() * c.width; }
-        g.globalAlpha = 0.25 + 0.35 * Math.abs(Math.sin(t / 1400 + m.p));
-        g.fillStyle = m.gold ? "#e6c77f" : "#7ff0e4"; g.beginPath(); g.arc(m.x, m.y, m.r, 0, 6.283); g.fill();
+      for (let i = 0; i < motes.length; i++) {
+        const m = motes[i];
+        if (kind === "summer-night") { // fireflies wander and pulse
+          m.a += (Math.random() - 0.5) * 0.3; m.x += Math.cos(m.a) * 0.6 * devicePixelRatio; m.y += Math.sin(m.a) * 0.4 * devicePixelRatio;
+          if (m.x < 0 || m.x > c.width || m.y < 0 || m.y > c.height) motes[i] = makeMote(kind, c.width, c.height, true);
+          const glow = Math.max(0, Math.sin(t / 700 + m.p * 3));
+          g.globalAlpha = 0.15 + 0.85 * glow; g.shadowBlur = 14 * devicePixelRatio; g.shadowColor = "#dfff6e";
+          g.fillStyle = "#e9ff8a"; g.beginPath(); g.arc(m.x, m.y, m.r, 0, 6.283); g.fill(); g.shadowBlur = 0;
+          continue;
+        }
+        m.y += m.vy; m.x += m.vx + Math.sin(t / 1800 + m.p) * 0.35 * devicePixelRatio; m.a += m.spin;
+        if (m.y > c.height + 12 || m.y < -14 * devicePixelRatio || m.x > c.width + 12) { motes[i] = makeMote(kind, c.width, c.height, false); continue; }
+        if (kind === "winter") {
+          g.globalAlpha = 0.75; g.fillStyle = "#f4f8ff"; g.beginPath(); g.arc(m.x, m.y, m.r, 0, 6.283); g.fill();
+        } else if (kind === "spring" || kind === "autumn") {
+          g.save(); g.translate(m.x, m.y); g.rotate(m.a); g.globalAlpha = kind === "spring" ? 0.8 : 0.85; g.fillStyle = m.c;
+          g.beginPath(); g.ellipse(0, 0, m.r, m.r * (kind === "spring" ? 0.62 : 0.45), 0, 0, 6.283); g.fill();
+          if (kind === "autumn") { g.strokeStyle = "rgba(60,25,10,0.6)"; g.lineWidth = 0.8 * devicePixelRatio; g.beginPath(); g.moveTo(-m.r, 0); g.lineTo(m.r * 1.3, 0); g.stroke(); }
+          g.restore();
+        } else {
+          g.globalAlpha = 0.25 + 0.35 * Math.abs(Math.sin(t / 1400 + m.p));
+          g.fillStyle = m.gold ? "#e6c77f" : "#7ff0e4"; g.beginPath(); g.arc(m.x, m.y, m.r, 0, 6.283); g.fill();
+        }
       }
     }
     requestAnimationFrame(frame);
@@ -112,39 +157,75 @@ function setState(state) {
   if (state === "listening") Sound.chime(true);
   else if (state === "thinking") { Sound.tick(); live.thinkStart = performance.now(); }
   else if (state === "idle" && prev === "speaking") Sound.chime(false);
-  if (state === "speaking" && butler.el) { pulse("data-nod", 260); setTimeout(() => pulse("data-pat", 220), 420); }
 }
 function currentAmp(now) {
   if (live.state !== "speaking" || !live.envelope.length) return 0;
   const i = Math.floor((now - live.envStart) / 1000 / live.envStep);
   return i >= 0 && i < live.envelope.length ? live.envelope[i] : 0;
 }
-/* The butler's snappy frame animation: mouth shapes from the voice envelope,
-   random blinks, a nod and a chest pat when he starts speaking. */
-const butler = { el: null, frame: -1, nextBlink: 0, blinkUntil: 0, lastSwap: 0 };
+/* The butler's snappy, frame-based animation. Every part switches between held
+   poses (no tweening): mouth shapes from the voice envelope, irregular blinks,
+   glances, an arched brow now and then, arm poses per state, and gestures. */
+const butler = { el: null, frame: -1, nextBlink: 0, blinkUntil: 0, lastSwap: 0, nextGlance: 0,
+  nextArch: 0, nextGesture: 0, poseUntil: 0, smileUntil: 0, lastState: "idle" };
+const GAZES = [[0, 0], [0, 0], [-2, 0], [2, 0], [-1.5, 1], [1.5, -0.8], [0, -1]];
 function flag(name, on) { if (on) butler.el.setAttribute(name, ""); else butler.el.removeAttribute(name); }
 function pulse(name, ms) { flag(name, true); setTimeout(() => flag(name, false), ms); }
+function setPose(pose, ms) { butler.el.dataset.pose = pose; butler.poseUntil = ms ? performance.now() + ms : 0; }
+function look(dx, dy) { $("#irises").style.transform = `translate(${dx}px, ${dy}px)`; }
+function gesture(name, ms = 1300) {
+  if (!butler.el) return;
+  butler.el.dataset.gesture = name; setPose("chest");
+  setTimeout(() => { if (butler.el.dataset.gesture === name) delete butler.el.dataset.gesture; }, ms);
+}
 function animateButler(now) {
   const b = butler; if (!b.el) b.el = $("#bust");
-  if (now - b.lastSwap > 70) { // swap mouth frames at ~14 fps for a hand-drawn feel
+  const s = live.state;
+  if (s !== b.lastState) { // pose changes on entering a state
+    if (s === "thinking") { setPose("glasses", 1400); look(2, -1.5); }
+    else if (s === "listening") { setPose("chest"); look(0, 0); }
+    else if (s === "speaking") { pulse("data-nod", 260); b.nextGesture = now + 900; }
+    else if (s === "idle" && b.lastState === "speaking") b.smileUntil = now + 1300;
+    b.lastState = s;
+  }
+  if (now - b.lastSwap > 70) { // mouth frames at ~14 fps for a hand-drawn feel
     b.lastSwap = now;
-    const raw = live.state === "speaking" ? currentAmp(now) : 0;
-    const frame = raw < 0.12 ? 0 : raw < 0.4 ? 1 : raw < 0.7 ? 2 : 3;
+    const raw = s === "speaking" ? currentAmp(now) : 0;
+    const frame = s !== "speaking" && now < b.smileUntil ? "smile" : raw < 0.12 ? 0 : raw < 0.4 ? 1 : raw < 0.7 ? 2 : 3;
     if (frame !== b.frame) { b.frame = frame; b.el.dataset.mouth = frame; }
     flag("data-emph", frame === 3);
   }
-  if (!b.nextBlink) b.nextBlink = now + 2000;
+  if (b.poseUntil && now > b.poseUntil) setPose("chest");
+  if (s === "speaking" && now > b.nextGesture) { // an open-palm gesture now and then
+    if (Math.random() < 0.45) setPose("present", 1500);
+    b.nextGesture = now + 2600 + Math.random() * 2200;
+  }
+  if (!b.nextBlink) { b.nextBlink = now + 2000; b.nextGlance = now + 2500; b.nextArch = now + 15000; }
   if (now > b.nextBlink) { // blink at irregular intervals, sometimes twice
     flag("data-blink", true); b.blinkUntil = now + 110;
     b.nextBlink = now + (Math.random() < 0.2 ? 260 : 2400 + Math.random() * 3600);
   }
   if (b.blinkUntil && now > b.blinkUntil) { flag("data-blink", false); b.blinkUntil = 0; }
+  if (now > b.nextGlance && (s === "idle" || s === "speaking")) { // glance about
+    const [dx, dy] = s === "speaking" ? [0, 0] : GAZES[Math.floor(Math.random() * GAZES.length)];
+    look(dx, dy); b.nextGlance = now + 1500 + Math.random() * 2800;
+  }
+  if (now > b.nextArch) { // the dry-wit eyebrow
+    if (s === "idle" || s === "speaking") { b.el.dataset.brow = "arch"; setTimeout(() => delete b.el.dataset.brow, 1100); }
+    b.nextArch = now + 12000 + Math.random() * 14000;
+  }
 }
 function startHalo() {
   const c = $("#halo"), g = c.getContext("2d"), bars = 96;
   const size = () => { const r = c.getBoundingClientRect(); c.width = Math.max(1, r.width * devicePixelRatio); c.height = Math.max(1, r.height * devicePixelRatio); };
   size(); new ResizeObserver(size).observe(c.parentElement);
+  let lastHalo = 0;
   (function frame(now) {
+    // 30 fps while active, 15 at rest, nothing while hidden: the halo was the
+    // interface's main CPU cost when redrawn at the screen's full refresh rate
+    const interval = live.state === "idle" && live.micShown < 0.05 ? 66 : 33;
+    if (document.hidden || now - lastHalo < interval) { requestAnimationFrame(frame); return; }
+    lastHalo = now;
     const w = c.width, h = c.height, cx = w / 2, cy = h / 2, R = w * 0.335;
     g.clearRect(0, 0, w, h);
     live.amp += (currentAmp(now) - live.amp) * 0.35;
@@ -189,6 +270,7 @@ function buildDials() {
     const needle = el("g", { class: "needle" }, svg);
     el("path", { d: "M50 52 L48.4 50 L50 20 L51.6 50 Z", fill: "#5fe3d6", filter: "url(#glowCyan)" }, needle);
     el("circle", { cx: 50, cy: 52, r: 4, fill: "#c9a45c", stroke: "#f6e2a4", "stroke-width": 0.8 }, svg);
+    el("path", { class: "crack", d: "M50 14 L46 27 L53 34 L47 46 M53 34 L63 39 L68 47 M46 27 L36 24" }, svg); // for "power level"
     const lab = document.createElement("div"); lab.className = "label"; lab.textContent = label;
     const val = document.createElement("div"); val.className = "value"; val.textContent = "—";
     wrap.append(lab, val); $("#dials").appendChild(wrap);
@@ -226,8 +308,8 @@ function toolEvent({ phase, tool, success }) {
 function setMode(mode, model) {
   const b = $("#mode-badge");
   b.classList.toggle("local", mode === "local");
-  b.textContent = mode === "local" ? `Local · ${(model || "").replace(":latest", "")}` : mode === "cloud" ? "Claude" : "Waking";
-  $("#mind-engine").textContent = mode === "local" ? `${model} (offline)` : mode === "cloud" ? "Claude Opus 5.5" : "—";
+  b.textContent = mode === "local" ? `Local · ${(model || "").replace(":latest", "")}` : mode === "cloud" ? `Gemini · key ${(model || "").split("key ")[1] || 1}` : "Waking";
+  $("#mind-engine").textContent = mode === "local" ? `${model} (local)` : mode === "cloud" ? (model || "Gemini") : "—";
   $("#tel-mind").textContent = mode === "local" ? "LOCAL" : mode === "cloud" ? "CLOUD" : "—";
 }
 function relTime(sec) { const m = Math.max(0, Math.round((sec * 1000 - Date.now()) / 60000)); return m < 1 ? "now" : m < 60 ? `in ${m} min` : `in ${Math.floor(m / 60)} h ${m % 60} m`; }
@@ -236,14 +318,23 @@ function fillList(id, items, empty, render) {
   if (!items.length) { const li = document.createElement("li"); li.className = "empty"; li.textContent = empty; ul.appendChild(li); return; }
   items.forEach((it) => ul.appendChild(render(it)));
 }
+let lastSnapshot = null;
 function applySnapshot(s) {
   if (!s) return;
+  lastSnapshot = s;
   if (s.mode) setMode(s.mode, s.model);
   $("#tel-voice").textContent = s.voice ? "ON" : "OFF";
   fillList("#reminders", s.reminders || [], "No engagements pending.", (r) => {
     const li = document.createElement("li"); li.append(r.text); const w = document.createElement("span"); w.className = "when"; w.textContent = relTime(r.due); li.appendChild(w); return li;
   });
   fillList("#memory", (s.memory || []).slice(-6).reverse(), "Nothing committed to memory.", (f) => { const li = document.createElement("li"); li.textContent = f; return li; });
+  fillList("#agenda", s.agenda || [], "The agenda is clear.", (task) => {
+    const li = document.createElement("li"); li.append(task.task); if (task.overdue) li.className = "overdue";
+    const w = document.createElement("span"); w.className = "when"; w.textContent = task.due; li.appendChild(w); return li;
+  });
+  const rupees = (n) => `₹${Math.round(n || 0).toLocaleString("en-IN")}`;
+  if (s.spent_today != null) $("#spent-today").textContent = rupees(s.spent_today);
+  if (s.spent_month != null) $("#spent-month").textContent = rupees(s.spent_month);
   const v = s.vitals || {};
   if (v.battery != null) setDial("battery", v.battery, `${Math.round(v.battery)}%${v.charging ? " ⚡" : ""}`); else setDial("battery", 0, "mains");
   if (v.cpu != null) setDial("cpu", v.cpu, `${Math.round(v.cpu)}%`);
@@ -266,6 +357,9 @@ window.Sebas = {
       case "speech": live.envelope = evt.envelope || []; live.envStep = evt.step || 0.04; live.envStart = performance.now(); break;
       case "mode": setMode(evt.mode, evt.model); break;
       case "notice": addEntry("notice", evt.text); break;
+      case "gesture": gesture(evt.name); break;
+      case "sleep": gesture("bow", 4000); setState("idle"); $("#farewell").classList.add("on"); break;
+      case "egg": Eggs.play(evt.name); break;
     }
   },
 };
@@ -307,11 +401,15 @@ const Demo = {
     setMode("cloud"); $("#tel-voice").textContent = "DEMO";
     applySnapshot({ mode: "cloud", voice: true, vitals: { battery: 86, charging: true, cpu: 23, memory: 71 },
       reminders: [{ due: Date.now() / 1000 + 900, text: "Stretch" }, { due: Date.now() / 1000 + 3600, text: "Call the tailor" }],
-      memory: ["The user prefers tea over coffee.", "Main project: the portfolio site.", "Prefers metric units."] });
+      memory: ["The user prefers tea over coffee.", "Main project: the portfolio site.", "Prefers metric units."],
+      agenda: [{ task: "Submit the DBMS assignment", due: "Fri 13 Nov 05:00 PM" }, { task: "Renew the domain", due: "today", overdue: false }],
+      spent_today: 240, spent_month: 6850 });
     addEntry("user", "Sebas, how are my deployments?");
     addEntry("sebas", "All three deployments are healthy, sir. The portfolio was published to production four minutes ago.");
     addEntry("notice", "Listening. Say “Sebas, rise”, or ring the bell.");
     toolEvent({ phase: "start", tool: "vercel_deployments" }); toolEvent({ phase: "end", tool: "vercel_deployments", success: true });
+    if (frozen === "bow" || frozen === "sleep") { setState("idle"); setTimeout(() => (frozen === "bow" ? gesture("bow", 60000) : window.Sebas.receive({ type: "sleep" })), 100); return; }
+    if (frozen && frozen.startsWith("pose-")) { setTimeout(() => setPose(frozen.slice(5), 60000), 100); return; }
     if (frozen) { setState(frozen); if (frozen === "speaking") this.fakeSpeech(true); if (frozen === "listening") setInterval(() => { live.mic = 0.3 + Math.random() * 0.6; }, 120); return; }
     setInterval(() => { live.mic = live.state === "listening" ? 0.2 + Math.random() * 0.7 : Math.random() * 0.05; }, 150);
   },
@@ -330,9 +428,69 @@ const Demo = {
   },
 };
 
+/* ---------------- Anime Easter eggs ---------------- */
+const Eggs = {
+  timer: 0,
+  flash(name, ms) {
+    document.body.dataset.egg = name; clearTimeout(this.timer);
+    this.timer = setTimeout(() => { if (document.body.dataset.egg === name) delete document.body.dataset.egg; }, ms);
+  },
+  play(name) {
+    if (name === "nazarick-on" || name === "nazarick-off") return this.nazarick(name === "nazarick-on");
+    if (name === "divergence") return this.divergence();
+    if (name === "power") return this.power();
+    if (name === "butler") { this.flash("butler", 4000); gesture("bow", 1300); Sound.tone(110, 1.2, 0.06, "sawtooth"); }
+    if (name === "sharingan") { this.flash("sharingan", 5000); Sound.tone(1320, 0.12, 0.04, "square"); Sound.tone(660, 0.4, 0.03, "square", 0.12); }
+  },
+  nazarick(on) { // Ainz Ooal Gown
+    document.body.classList.toggle("nazarick", on);
+    $(".brand p").textContent = on ? "Head Butler · Great Tomb of Nazarick" : "Household Intelligence · Est. MMXXVI";
+    gesture("bow", 1600);
+    [196, 233, 294].forEach((f, i) => Sound.tone(on ? f : f * 2, 1.4, 0.04, "triangle", i * 0.12));
+  },
+  power() { // It's over 9000!
+    this.flash("power", 5200);
+    Object.values(dials).forEach((d, i) => setTimeout(() => {
+      d.needle.style.transform = "rotate(152deg)"; d.val.textContent = "OVER 9000"; Sound.tone(400 + i * 220, 0.25, 0.05, "square");
+    }, i * 260));
+    setTimeout(() => applySnapshot(lastSnapshot), 5300);
+  },
+  divergence() { // El Psy Kongroo
+    const box = $("#divergence"), tubes = box.querySelector(".tubes"), target = "1.048596";
+    tubes.replaceChildren(...[...target].map((ch) => {
+      const d = document.createElement("div"); d.className = "tube" + (ch === "." ? " dot" : ""); d.textContent = ch === "." ? "." : "0"; return d;
+    }));
+    box.classList.add("on");
+    const cells = [...tubes.children];
+    const roll = setInterval(() => cells.forEach((c, i) => { if (!c.dataset.done && target[i] !== ".") c.textContent = Math.floor(Math.random() * 10); }), 70);
+    cells.forEach((c, i) => setTimeout(() => { c.dataset.done = "1"; c.textContent = target[i]; Sound.tick(); }, 1300 + i * 260));
+    setTimeout(() => clearInterval(roll), 1300 + cells.length * 260);
+    setTimeout(() => box.classList.remove("on"), 8200);
+  },
+};
+// Konami code: up up down down left right left right B A, toggles Sebas Tian's attire
+const KONAMI = ["ArrowUp", "ArrowUp", "ArrowDown", "ArrowDown", "ArrowLeft", "ArrowRight", "ArrowLeft", "ArrowRight", "b", "a"];
+let konamiAt = 0;
+function setCostume(on, quiet) {
+  const bust = $("#bust");
+  if (on) bust.dataset.costume = "tian"; else delete bust.dataset.costume;
+  prefs.costume = on; savePrefs();
+  if (quiet) return;
+  addEntry("notice", on ? "A change of attire: Sebas Tian, Head Butler of Nazarick." : "The household attire, restored.");
+  gesture("bow", 1300); Sound.bell();
+}
+addEventListener("keydown", (e) => {
+  if (document.activeElement === $("#ask")) return;
+  const key = e.key.length === 1 ? e.key.toLowerCase() : e.key;
+  konamiAt = key === KONAMI[konamiAt] ? konamiAt + 1 : key === KONAMI[0] ? 1 : 0;
+  if (konamiAt === KONAMI.length) { konamiAt = 0; setCostume($("#bust").dataset.costume !== "tian"); }
+});
+
 /* ---------------- Boot ---------------- */
 function boot() {
   buildRings(); buildDials(); startDust(); startHalo(); startClock(); wireControls();
+  if (prefs.costume || params.get("costume") === "tian") setCostume(true, true);
+  if (params.get("egg")) setTimeout(() => Eggs.play(params.get("egg")), 900); // for previews
   const skip = params.has("noboot");
   if (skip) $("#boot").remove(); else setTimeout(() => $("#boot").classList.add("done"), 3000);
   if (!skip) setTimeout(() => Sound.bell(), 1200);

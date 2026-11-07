@@ -88,7 +88,7 @@ class SebasApp:
             emit("notice", text=f"Sebas cannot think yet: {exc}")
             emit("state", state="idle")
             return
-        emit("mode", mode=self.brain.mode, model=self.brain.local_model or "Claude")
+        emit("mode", mode=self.brain.mode, model=self.brain.short_description)
 
         try:
             if self.voice:
@@ -104,13 +104,23 @@ class SebasApp:
             logger.exception("Voice unavailable")
             emit("notice", text=f"Voice is unavailable ({type(exc).__name__}); typing still works.")
 
+        from custom_tools import notes
         from custom_tools.laptop import set_announcer
+
+        if self.mouth is not None:
+            notes.set_reader(self.mouth.speak)
 
         def announce(text: str) -> None:
             emit("transcript", role="sebas", text=text)
             self._speak(text)
 
         set_announcer(announce)
+        from sebas_scheduler import Scheduler
+
+        import run_sebas as _rs
+
+        self.discord = _rs.start_discord(self.brain)
+        Scheduler(announce, self._converse, self.discord).start()
         threading.Thread(target=self._serve_typed_requests, daemon=True).start()
         if self.voice and self.listener is not None:
             threading.Thread(target=self._voice_loop, daemon=True).start()
@@ -127,6 +137,9 @@ class SebasApp:
                 run_sebas.run_voice_turn(
                     self.listener, self.ears, self.mouth, self.brain, run_sebas.follow_up_seconds()
                 )
+            except run_sebas.SebasSleep:
+                self._retire()
+                return
             except Exception as exc:
                 logger.exception("Voice loop error")
                 emit("notice", text=f"The microphone stopped ({type(exc).__name__}). Retrying shortly.")
@@ -139,6 +152,14 @@ class SebasApp:
         while True:
             text = self._requests.get()
             emit("transcript", role="user", text=text)
+            from voice_pipeline.name_listener import is_sleep_request
+
+            if is_sleep_request(text):
+                run_sebas.say_farewell(self.mouth)
+                self._retire()
+                return
+            if run_sebas.handle_egg(text, self.mouth):
+                continue
             emit("state", state="thinking")
             try:
                 reply = self.brain.ask(text)
@@ -147,6 +168,21 @@ class SebasApp:
                 reply = run_sebas._FAILURE_REPLY
             emit("transcript", role="sebas", text=reply)
             self._speak(reply)
+
+    def _converse(self, prompt: str, expect_reply: bool) -> str:
+        """A scheduled prompt (briefing, check-in): Sebas speaks first."""
+        emit("state", state="thinking")
+        reply = self.brain.ask(prompt)
+        emit("transcript", role="sebas", text=reply)
+        self._speak(reply)
+        if expect_reply and self.listener is not None and self.voice:
+            self.listener.push_to_talk()  # take the answer without needing "Sebas"
+        return reply
+
+    def _retire(self) -> None:
+        """After the farewell: let the page play its closing animation, then close."""
+        time.sleep(2.2)
+        self.bridge.window.destroy()
 
     def _speak(self, text: str) -> None:
         if self.mouth is None:
@@ -172,7 +208,8 @@ class SebasApp:
         return True
 
     def snapshot(self) -> dict[str, Any]:
-        from custom_tools import laptop, memory
+        from custom_tools import household, laptop, memory
+        from custom_tools.household import describe_due
 
         with laptop._reminders_lock:
             reminders = [
@@ -182,10 +219,14 @@ class SebasApp:
         brain = self.brain
         return {
             "mode": brain.mode if brain else "starting",
-            "model": (brain.local_model if brain and brain.mode == "local" else "Claude") if brain else "",
+            "model": brain.short_description if brain else "",
             "memory": memory.read_facts(),
             "reminders": reminders,
             "vitals": vitals(),
+            "agenda": [{"task": t["task"], "due": describe_due(t.get("due")), "overdue": "overdue" in describe_due(t.get("due"))}
+                       for t in household.open_tasks()[:6]],
+            "spent_month": household.expense_totals("month")[0],
+            "spent_today": household.expense_totals("today")[0],
             "voice": bool(self.voice and self.listener is not None),
         }
 

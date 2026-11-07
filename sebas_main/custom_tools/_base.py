@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import logging
 import os
-from typing import Any, ClassVar
+from typing import Any, Callable, ClassVar
 
 import httpx
 from openjarvis.core.types import ToolResult
@@ -60,6 +60,14 @@ def http_get_json(
     return response.json()
 
 
+# Set while a request from outside the laptop (Discord) is being handled. Tools
+# that act on the laptop then hand the action to ``confirm_remote`` instead of
+# running it, so nothing happens on the laptop without the user's explicit yes.
+# Requests are serialised by the brain's lock, so a plain flag is enough.
+REMOTE_REQUEST = False
+confirm_remote: Callable[[str, dict[str, Any], str], str] | None = None
+
+
 class SebasTool(BaseTool):
     """A tool defined by class attributes plus a ``run`` method returning text."""
 
@@ -67,6 +75,7 @@ class SebasTool(BaseTool):
     description: ClassVar[str]
     parameters: ClassVar[dict[str, Any]] = {"type": "object", "properties": {}}
     timeout_seconds: ClassVar[float] = 30.0
+    acts_on_laptop: ClassVar[bool] = False  # needs confirmation when asked remotely
 
     @property
     def spec(self) -> ToolSpec:
@@ -85,6 +94,12 @@ class SebasTool(BaseTool):
         raise NotImplementedError
 
     def execute(self, **params: Any) -> ToolResult:
+        if REMOTE_REQUEST and self.acts_on_laptop and confirm_remote is not None:
+            return ToolResult(tool_name=self.name, content=confirm_remote(self.name, params, self.description))
+        return self.run_now(**params)
+
+    def run_now(self, **params: Any) -> ToolResult:
+        """Run the tool, bypassing the remote confirmation gate."""
         try:
             return ToolResult(tool_name=self.name, content=self.run(**params))
         except ToolError as exc:

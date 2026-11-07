@@ -3,9 +3,9 @@
 faster-whisper>=1.0
 # faster-whisper 1.2.1 passes metadata_errors to av.open(), which PyAV 19 removed.
 av>=11,<19
-kokoro>=0.9
-# Kokoro's English pronunciation model. It would otherwise download on first use.
-en-core-web-sm @ https://github.com/explosion/spacy-models/releases/download/en_core_web_sm-3.8.0/en_core_web_sm-3.8.0-py3-none-any.whl
+# Kokoro voices via ONNX Runtime: ~1/5 of the memory of the PyTorch build. The
+# model files (~200 MB) download to ~/.cache/sebas/kokoro on first run.
+kokoro-onnx>=0.6
 sounddevice>=0.5
 soundfile>=0.12
 numpy>=1.24

@@ -42,7 +42,8 @@ class Ears:
         if self._model is None:
             from faster_whisper import WhisperModel
 
-            self._model = WhisperModel(self._model_size, device="cpu", compute_type="int8")
+            # 4 threads: quick enough, and leaves the rest of the laptop responsive
+            self._model = WhisperModel(self._model_size, device="cpu", compute_type="int8", cpu_threads=4)
 
     def transcribe(self, pcm: np.ndarray) -> str:
         """Transcribe 16 kHz int16 mono audio."""

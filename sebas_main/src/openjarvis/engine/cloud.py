@@ -391,10 +391,38 @@ def _convert_tools_to_anthropic(
     return result
 
 
+_THINKING_BUDGETS = {"minimal": 0, "low": 512, "medium": 2048, "high": -1}
+
+
+def _google_thinking_config(model: str, genai_types: Any) -> Any:
+    """How hard Gemini thinks before answering: SEBAS_GEMINI_THINKING
+    (minimal | low | medium | high, default low; "default" leaves Google's).
+
+    Left unset, Gemini 3 Flash thinks at full depth on every request, even a
+    greeting: slower replies and more tokens. Gemini 3 takes a thinking level,
+    2.5 a token budget; other models are left alone.
+    """
+    level = os.environ.get("SEBAS_GEMINI_THINKING", "low").strip().lower() or "low"
+    if level not in _THINKING_BUDGETS:
+        return None
+    name = model.lower()
+    if name.startswith("gemini-3"):
+        return genai_types.ThinkingConfig(thinking_level=level.upper())
+    if name.startswith("gemini-2.5"):
+        return genai_types.ThinkingConfig(thinking_budget=_THINKING_BUDGETS[level])
+    return None
+
+
 def _convert_tools_to_google(
     openai_tools: List[Dict[str, Any]],
 ) -> List[Dict[str, Any]]:
-    """Convert OpenAI function-calling tools to Google function declarations."""
+    """Convert OpenAI function-calling tools to Google function declarations.
+
+    The schema goes in ``parameters_json_schema``, which accepts standard JSON
+    Schema. The older ``parameters`` field takes Gemini's restricted OpenAPI
+    subset and rejects common keywords such as ``additionalProperties`` with
+    400 INVALID_ARGUMENT (the built-in get_weather tool uses it).
+    """
     declarations = []
     for tool in openai_tools:
         func = tool.get("function", {})
@@ -402,7 +430,8 @@ def _convert_tools_to_google(
             {
                 "name": func.get("name", ""),
                 "description": func.get("description", ""),
-                "parameters": func.get("parameters", {}),
+                "parameters_json_schema": func.get("parameters")
+                or {"type": "object", "properties": {}},
             }
         )
     return declarations
@@ -949,6 +978,9 @@ class CloudEngine(InferenceEngine):
         )
         if system_text:
             config.system_instruction = system_text
+        thinking = _google_thinking_config(model, genai_types)
+        if thinking is not None:
+            config.thinking_config = thinking
 
         # Convert and pass tools in Google format
         raw_tools = kwargs.pop("tools", None)
@@ -990,9 +1022,12 @@ class CloudEngine(InferenceEngine):
                         "arguments": json.dumps(fc_args),
                     }
                     # Preserve thought_signature for Gemini reasoning models
+                    # Kept only in the engine's own map, which is what replays it.
+                    # As raw bytes inside the returned tool_calls it crashed the
+                    # JSON trace/telemetry writers ("bytes is not JSON
+                    # serializable") on every Gemini tool call.
                     sig = getattr(part, "thought_signature", None)
                     if sig is not None:
-                        tc_dict["thought_signature"] = sig
                         self._thought_sigs[tc_dict["id"]] = sig
                     tool_calls.append(tc_dict)
                 elif hasattr(part, "text") and part.text:

@@ -1,20 +1,66 @@
-"""Speech output with Kokoro."""
+"""Speech output with Kokoro, run through ONNX Runtime (no PyTorch).
+
+The same Kokoro voices (bm_george and friends) as the PyTorch build, at about a
+fifth of the memory: measured on this laptop, ~205 MB instead of ~1,140 MB,
+loading in 2 s instead of 10 s. The fp16 model and voices (~200 MB) are
+downloaded to ~/.cache/sebas/kokoro on first use.
+"""
 
 from __future__ import annotations
 
 import io
+import logging
+import os
 import queue
 import re
 import threading
+from pathlib import Path
 
 import numpy as np
 import soundfile as sf
-from openjarvis.speech.kokoro_tts import KokoroTTSBackend
 from openjarvis.speech.voice_io import play_wav
 
 from sebas_events import emit
 
+logger = logging.getLogger(__name__)
+
 _CHIME_RATE = 24000
+_MODEL_DIR = Path(os.environ.get("SEBAS_TTS_DIR") or Path.home() / ".cache" / "sebas" / "kokoro")
+_MODEL_URL = "https://github.com/thewh1teagle/kokoro-onnx/releases/download/model-files-v1.0/"
+_MODEL_FILE, _VOICES_FILE = "kokoro-v1.0.fp16.onnx", "voices-v1.0.bin"
+_TTS_THREADS = 4  # faster than real time on this CPU without hogging every core
+
+
+def _ensure_model_files() -> tuple[Path, Path]:
+    import httpx
+
+    _MODEL_DIR.mkdir(parents=True, exist_ok=True)
+    for name in (_MODEL_FILE, _VOICES_FILE):
+        target = _MODEL_DIR / name
+        if target.exists() and target.stat().st_size > 1_000_000:
+            continue
+        logger.warning("Downloading the voice model %s (first run only)...", name)
+        partial = target.with_suffix(".part")
+        with httpx.stream("GET", _MODEL_URL + name, follow_redirects=True, timeout=120) as response:
+            response.raise_for_status()
+            with open(partial, "wb") as fh:
+                for chunk in response.iter_bytes(1 << 20):
+                    fh.write(chunk)
+        partial.replace(target)
+    return _MODEL_DIR / _MODEL_FILE, _MODEL_DIR / _VOICES_FILE
+
+
+def _load_kokoro():
+    import onnxruntime as ort
+    from kokoro_onnx import Kokoro
+
+    model, voices = _ensure_model_files()
+    options = ort.SessionOptions()
+    options.enable_cpu_mem_arena = False  # the arena alone held ~400 MB that speech never needed
+    options.intra_op_num_threads = _TTS_THREADS
+    options.graph_optimization_level = ort.GraphOptimizationLevel.ORT_ENABLE_ALL
+    session = ort.InferenceSession(str(model), options, providers=["CPUExecutionProvider"])
+    return Kokoro.from_session(session, str(voices))
 _ENVELOPE_STEP = 0.04  # seconds per loudness value sent to the UI
 
 
@@ -50,8 +96,9 @@ class Mouth:
     """Speaks text through the default output device."""
 
     def __init__(self, voice: str) -> None:
-        self._backend = KokoroTTSBackend(device="cpu")
+        self._kokoro = None
         self._voice = voice
+        self._lang = "en-gb" if voice.startswith("b") else "en-us"
         # Reminders speak from a timer thread; one voice at a time.
         self._speaking = threading.Lock()
 
@@ -60,9 +107,12 @@ class Mouth:
         self._synthesize("Ready.")
 
     def _synthesize(self, sentence: str) -> bytes:
-        return self._backend.synthesize(
-            sentence, voice_id=self._voice, output_format="wav"
-        ).audio
+        if self._kokoro is None:
+            self._kokoro = _load_kokoro()
+        audio, rate = self._kokoro.create(sentence, voice=self._voice, speed=1.0, lang=self._lang)
+        buffer = io.BytesIO()
+        sf.write(buffer, audio, rate, format="WAV")
+        return buffer.getvalue()
 
     def speak(self, text: str) -> None:
         """Speak ``text``, starting as soon as its first sentence is ready."""

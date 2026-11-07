@@ -6,8 +6,10 @@ rem   run.bat --no-voice   Desktop interface, typing only
 rem   run.bat --console    Voice mode in this console window, no interface
 rem   run.bat --text       Typing in this console window, no interface
 rem   run.bat --mic-test   Measure the microphone and suggest SEBAS_SILENCE_THRESHOLD
-rem Uses Claude when sebas_main\.env has ANTHROPIC_API_KEY and the internet is up;
-rem otherwise a local model through Ollama.
+rem Say "Sebas, sleep" (or type it) and he says goodbye and closes.
+rem If DISCORD_BOT_TOKEN is set, the Discord bot starts too (and stops when Sebas closes).
+rem Thinks with Gemini (GEMINI_API_KEY, then GEMINI_API_KEY_2 in sebas_main\.env);
+rem when both are out of quota, or offline, with a local model through Ollama.
 
 set "REPO=%~dp0sebas_main"
 set "PYTHON=%REPO%\.venv\Scripts\python.exe"

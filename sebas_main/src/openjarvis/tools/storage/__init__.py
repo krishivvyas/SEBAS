@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import importlib.util
+
 # Always-available backend
 import openjarvis.tools.storage.sqlite  # noqa: F401
 
@@ -16,10 +18,14 @@ try:
 except ImportError:
     pass
 
-try:
-    import openjarvis.tools.storage.colbert_backend  # noqa: F401
-except ImportError:
-    pass
+# Check for colbert-ai *before* importing the backend: the backend imports
+# torch first, so without this guard a machine that has torch but not
+# colbert-ai loads ~200 MB of torch only to discard the backend.
+if importlib.util.find_spec("colbert") is not None:
+    try:
+        import openjarvis.tools.storage.colbert_backend  # noqa: F401
+    except ImportError:
+        pass
 
 try:
     import openjarvis.tools.storage.hybrid  # noqa: F401

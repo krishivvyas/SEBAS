@@ -37,6 +37,25 @@ def _events_api(token: str, time_min: str, time_max: str) -> dict:
     return response.json()
 
 
+def events_between(start: datetime, end: datetime) -> list[tuple[str, datetime, str]]:
+    """Timed calendar events starting in [start, end): (id, start, title).
+
+    Returns [] when the calendar is not connected; raises on API errors.
+    """
+    path = calendar_credentials_path()
+    if not path.exists():
+        return []
+    from openjarvis.connectors.google_auth import call_with_refresh
+
+    data = call_with_refresh(_events_api, str(path), start.astimezone().isoformat(), end.astimezone().isoformat())
+    found = []
+    for event in data.get("items", []):
+        when = event.get("start", {}).get("dateTime")
+        if when:
+            found.append((event.get("id", ""), datetime.fromisoformat(when).astimezone(), event.get("summary", "(no title)")))
+    return found
+
+
 def upcoming_events(hours: int = 24) -> str:
     path = calendar_credentials_path()
     if not path.exists():
