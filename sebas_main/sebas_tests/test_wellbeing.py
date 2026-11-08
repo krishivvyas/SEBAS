@@ -75,6 +75,37 @@ class Nudges(unittest.TestCase):
         self.assertEqual([(n.kind, n.spoken) for n in nudges], [("eye", False)])
 
 
+class Agenda(unittest.TestCase):
+    """Heard live: three copies of one to-do, and "mark them all done" kept failing."""
+
+    def setUp(self):
+        tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(tmp.cleanup)
+        p = mock.patch.object(household, "get_data_dir", return_value=Path(tmp.name))
+        p.start()
+        self.addCleanup(p.stop)
+        add = household.AddTaskTool().run
+        for due in ("2026-11-09", "2026-11-10", ""):
+            add("add internet search or browse Google search to Sebas", due)
+        add("buy milk")
+
+    def test_duplicates_close_together(self):
+        r = household.CompleteTaskTool().run("internet search for Sebas")
+        self.assertTrue(r.startswith("Done (3)"), r)
+        self.assertEqual([t["task"] for t in household.open_tasks()], ["buy milk"])
+
+    def test_all(self):
+        self.assertTrue(household.CompleteTaskTool().run("all").startswith("Done (4)"))
+        self.assertEqual(household.open_tasks(), [])
+        with self.assertRaises(Exception):
+            household.CompleteTaskTool().run("all")  # nothing left
+
+    def test_cancel_every_match(self):
+        r = household.CompleteTaskTool().run("google search", cancel=True, every_match=True)
+        self.assertTrue(r.startswith("Removed (3)"), r)
+        self.assertEqual(len(household.load("agenda")), 1)
+
+
 class Storage(unittest.TestCase):
     def setUp(self):
         tmp = tempfile.TemporaryDirectory()

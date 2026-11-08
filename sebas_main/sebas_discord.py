@@ -77,6 +77,7 @@ Anything that acts on the laptop waits for your **yes** before I do it. This cha
 *What's on my agenda?* · open tasks, soonest first
 *Mark the assignment as done* · completes it
 *Cancel the dentist task* · removes it
+*Mark everything as done* / *clear my agenda* · closes or removes every open task at once (copies of one task close together)
 I warn you an hour before a deadline (in #alerts), and on the morning of date-only deadlines.""",
 
 """## Money (₹)

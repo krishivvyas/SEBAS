@@ -134,26 +134,58 @@ class ListTasksTool(SebasTool):
 @ToolRegistry.register("complete_task")
 class CompleteTaskTool(SebasTool):
     name = "complete_task"
-    description = "Mark a to-do as done (or remove it if the user cancels it)."
+    description = (
+        "Mark to-dos as done (or remove them if the user cancels). One call can close "
+        "several: task='all' closes every open to-do, and every_match=true closes all "
+        "that match the description. Duplicates with the same wording close together."
+    )
     parameters = {
         "type": "object",
         "properties": {
-            "task": {"type": "string", "description": "The to-do, as the user describes it."},
+            "task": {"type": "string", "description": "The to-do, as the user describes it; 'all' for every open one."},
             "cancel": {"type": "boolean", "description": "true to delete instead of marking done."},
+            "every_match": {"type": "boolean", "description": "true to close every to-do matching the description."},
         },
         "required": ["task"],
     }
 
-    def run(self, task: str, cancel: bool = False) -> str:
+    def run(self, task: str, cancel: bool = False, every_match: bool = False) -> str:
         with _lock:
             items = load("agenda")
-            match = _best_match([i for i in items if not i.get("done")], task, "task")
+            chosen = _choose_tasks([i for i in items if not i.get("done")], task, every_match)
+            ids = {i["id"] for i in chosen}
             if cancel:
-                items = [i for i in items if i["id"] != match["id"]]
+                items = [i for i in items if i["id"] not in ids]
             else:
-                match["done"] = datetime.now().isoformat(timespec="minutes")
+                stamp = datetime.now().isoformat(timespec="minutes")
+                for i in chosen:
+                    i["done"] = stamp
             save("agenda", items)
-        return f"{'Removed' if cancel else 'Done'}: {match['task']}."
+        names = list(dict.fromkeys(i["task"] for i in chosen))  # duplicates named once
+        return f"{'Removed' if cancel else 'Done'} ({len(chosen)}): " + "; ".join(names) + "."
+
+
+_EVERYTHING = {"all", "everything", "all tasks", "all of them", "every task", "the whole agenda", "all to-dos", "all todos"}
+
+
+def _choose_tasks(open_items: list[dict], text: str, every_match: bool) -> list[dict]:
+    """The open to-dos a request refers to: all of them, every match, or the best one
+    together with any exact duplicates of it (same wording, any date)."""
+    if not open_items:
+        raise ToolError("The agenda is already clear.")
+    if text.strip().lower().strip(".!") in _EVERYTHING:
+        return list(open_items)
+    target = text.strip().lower()
+    if every_match:
+        hits = [i for i in open_items
+                if target in i["task"].lower() or SequenceMatcher(None, target, i["task"].lower()).ratio() >= 0.6]
+        if not hits:
+            raise ToolError(f"Nothing matches '{text}'.")
+        return hits
+    same = lambda a, b: " ".join(a.lower().split()) == " ".join(b.lower().split())  # noqa: E731
+    distinct = list({" ".join(i["task"].lower().split()): i for i in open_items}.values())
+    best = _best_match(distinct, text, "task")
+    return [i for i in open_items if same(i["task"], best["task"])]
 
 
 # --------------------------------------------------------------------------- expenses

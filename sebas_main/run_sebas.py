@@ -325,7 +325,28 @@ def setup_logging() -> str:
         pass  # a log file is a convenience, never a reason not to start
     logging.basicConfig(level=logging.WARNING, handlers=handlers, force=True)
     logging.getLogger("sebas").setLevel(logging.INFO)  # only Sebas's INFO, not every library's
+    for handler in handlers:
+        handler.addFilter(_known_harmless)
     return str(path)
+
+
+# Warnings seen in every session that need no action (live session, 2026-11-08):
+# Discord voice libraries Sebas does not use, OpenJarvis's optional Rust extension
+# (Sebas keeps his own memory files), Kokoro splitting a word unusually, and the
+# genai SDK noting a tool call alongside the text. Kept out of the console and log
+# so that real problems stand out.
+_HARMLESS = (
+    ("discord.client", "voice will NOT be supported"),
+    ("openjarvis.security", "openjarvis_rust"),
+    ("openjarvis.system.builder", "openjarvis_rust"),
+    ("phonemizer", "words count mismatch"),
+    ("google_genai.types", "non-text parts in the response"),
+)
+
+
+def _known_harmless(record: logging.LogRecord) -> bool:
+    message = record.getMessage()
+    return not any(record.name == name and text in message for name, text in _HARMLESS)
 
 
 def main() -> int:
