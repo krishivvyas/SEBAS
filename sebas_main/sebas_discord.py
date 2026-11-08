@@ -100,6 +100,7 @@ Each evening at 21:30 I ask how your day went; answer here and I'll save it. On 
 """## Information
 *What's the weather?* · Gandhinagar, or ask about any city
 *Give me my morning briefing* · time, weather, agenda (calendar after December)
+*Who won the last F1 race?* · *what's the price of an RTX 5070 in India?* · I search the web and read the best page
 *Anything new on GitHub?* · your open PRs, review requests and notifications
 *How is my laptop doing?* · battery, CPU, memory, disk, uptime
 *Any sales on my Steam wishlist?* · *Any new light novels on Bookswagon?*
@@ -128,6 +129,27 @@ Only apps, sites and folders listed in `laptop.toml` can be opened. Turning Wi-F
 *Anything new on my list?* · new episodes, chapters and volumes since the last check (I also check every 30 minutes and post news in #alerts)
 *Suggest something short and funny for tonight* · recommendations from what you've rated highly""",
 
+"""## Study mode
+*Start a pomodoro on DBMS* · *50-minute blocks with 10-minute breaks* · *stop the pomodoro* · *how long have I studied today?*
+While you focus I hold non-urgent alerts and briefings until the break (deadlines, meetings and battery warnings still come through).
+*Make flashcards for DBMS* · from your notes in Documents › Sebas Notes (or *from C:/path/notes.pdf*); made once with Gemini, then reviewed offline
+*Review my DBMS flashcards* · *quiz me on DBMS* · open on the laptop's interface (spaced repetition: Again / Good / Easy)
+*My DBMS exam is on 20 November* · *what exams do I have?* · countdown on the interface and in the briefing, with a word a week, three days and a day before""",
+
+"""## Wellbeing (at the laptop)
+I keep an eye on you while you work: a nudge to stretch after about an hour without a break, a glass of water every 90 minutes, and a quiet on-screen 20-20-20 cue for your eyes every 20 minutes. Never while you're away, focusing, gaming or watching something full screen.
+*I drank water* · *how long have I been working?* · *pause the reminders for an hour* · *stop the eye reminders* · *remind me to stretch every 45 minutes*""",
+
+"""## The Games Room (at the laptop)
+*Sebas, let's play tic-tac-toe* · *pong* · *rock paper scissors* · *play a memory game* · *play anime trivia* · *connect four* · *hangman* · *play snake* · *I'm bored*
+Or press **Games** on the interface. The games are built in and need no AI or quota; my commentary is my own, with the odd anime reference.
+Tic-tac-toe and Connect Four have two levels: *Butler* (beatable) and *Nazarick* (I have not lost a game of either in testing). Anime hangman hides titles and characters behind a dimming lantern; Snake keeps your high score.""",
+
+"""## Hidden extras
+A butler keeps a few secrets. A hint or two, sir:
+*a certain Supreme One's guild name* · *the words of a mad scientist* · *ask whether I am merely a butler* · *ask after my power level* · *a certain red-eyed technique*
+At the laptop the interface reacts as well; here you have my word for it. The interface also hides a classic cheat code, and the ambient effects change with the seasons.""",
+
 """## Channels
 **#sebas** · talk to me
 **#alerts** · deadlines, reminders, battery, memory and disk warnings
@@ -137,7 +159,7 @@ Only apps, sites and folders listed in `laptop.toml` can be opened. Turning Wi-F
 **#commands** · this guide
 
 ## Not from Discord
-Sending me to sleep (*Sebas, sleep*) and voice commands work only at the laptop.""",
+Sending me to sleep (*Sebas, sleep*), the games and voice commands work only at the laptop.""",
 ]
 
 _STATUS_SECONDS = 300
@@ -351,6 +373,12 @@ class DiscordBridge:
         if egg is not None:  # the line only; the visual effect shows on the laptop's interface
             sebas_eggs.trigger(egg)
             await message.reply(f"*{egg.line}*", mention_author=False)
+            return
+        import sebas_games
+
+        if sebas_games.check(text) is not None:  # no quota spent on "let's play pong"
+            await message.reply("*The Games Room is at the laptop, sir. Say \"Sebas, let's play\" "
+                                "or press Games on the interface, and I shall be ready.*", mention_author=False)
             return
         async with message.channel.typing():
             reply = await self._in_thread(self._ask_remote, text)

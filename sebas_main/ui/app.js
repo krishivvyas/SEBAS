@@ -89,7 +89,7 @@ function startDust() {
   let lastDust = 0;
   (function frame(t) {
     // 30 fps is plenty for drifting particles; nothing is drawn while hidden or minimised
-    if (document.body.dataset.ambient !== "off" && !document.hidden && t - lastDust > 33) {
+    if (document.body.dataset.ambient !== "off" && !document.hidden && !document.body.classList.contains("gaming") && t - lastDust > 33) {
       lastDust = t;
       g.clearRect(0, 0, c.width, c.height);
       for (let i = 0; i < motes.length; i++) {
@@ -224,7 +224,7 @@ function startHalo() {
     // 30 fps while active, 15 at rest, nothing while hidden: the halo was the
     // interface's main CPU cost when redrawn at the screen's full refresh rate
     const interval = live.state === "idle" && live.micShown < 0.05 ? 66 : 33;
-    if (document.hidden || now - lastHalo < interval) { requestAnimationFrame(frame); return; }
+    if (document.hidden || document.body.classList.contains("gaming") || now - lastHalo < interval) { requestAnimationFrame(frame); return; }
     lastHalo = now;
     const w = c.width, h = c.height, cx = w / 2, cy = h / 2, R = w * 0.335;
     g.clearRect(0, 0, w, h);
@@ -339,6 +339,8 @@ function applySnapshot(s) {
   if (v.battery != null) setDial("battery", v.battery, `${Math.round(v.battery)}%${v.charging ? " ⚡" : ""}`); else setDial("battery", 0, "mains");
   if (v.cpu != null) setDial("cpu", v.cpu, `${Math.round(v.cpu)}%`);
   if (v.memory != null) setDial("memory", v.memory, `${Math.round(v.memory)}%`);
+  if (s.study && typeof Study !== "undefined") Study.apply(s.study);
+  if (s.wellbeing && typeof Wellbeing !== "undefined") Wellbeing.apply(s.wellbeing);
 }
 
 /* ---------------- Events from Python ---------------- */
@@ -360,13 +362,26 @@ window.Sebas = {
       case "gesture": gesture(evt.name); break;
       case "sleep": gesture("bow", 4000); setState("idle"); $("#farewell").classList.add("on"); break;
       case "egg": Eggs.play(evt.name); break;
+      case "game": if (typeof Games !== "undefined") Games.show(evt.name); break;  // a top-level const is not on window
+      case "wellbeing": if (typeof Wellbeing !== "undefined") Wellbeing.nudge(evt.nudge, evt.line); break;
+      case "study":
+        if (typeof Study === "undefined") break;
+        if (evt.view === "pomodoro") Study.setSession(evt.session);
+        else if (evt.view === "cards") Study.cards(evt.subject);
+        else if (evt.view === "quiz") Study.quiz(evt.subject);
+        break;
     }
   },
 };
 
 /* ---------------- Talking to Python ---------------- */
 const api = () => window.pywebview && window.pywebview.api;
-async function refresh() { const a = api(); if (a) { try { applySnapshot(await a.snapshot()); } catch {} } }
+async function refresh() {
+  // nothing to update on screen while minimised or while a game is open
+  if (document.hidden || document.body.classList.contains("gaming")) return;
+  const a = api(); if (a) { try { applySnapshot(await a.snapshot()); } catch {} }
+}
+document.addEventListener("visibilitychange", () => { if (!document.hidden) refresh(); });
 function send(text) {
   text = (text || "").trim(); if (!text) return;
   Sound.tick();
@@ -374,7 +389,7 @@ function send(text) {
 }
 function wireControls() {
   $("#bell-form").addEventListener("submit", (e) => { e.preventDefault(); send($("#ask").value); $("#ask").value = ""; });
-  document.querySelectorAll(".quick button").forEach((b) => b.addEventListener("click", () => send(b.dataset.ask)));
+  document.querySelectorAll(".quick button[data-ask]").forEach((b) => b.addEventListener("click", () => send(b.dataset.ask)));
   $("#bell").addEventListener("click", async () => {
     const bell = $("#bell"); bell.classList.remove("ring"); void bell.offsetWidth; bell.classList.add("ring"); Sound.bell();
     if (api()) await api().push_to_talk(); else setState("listening");
@@ -403,7 +418,10 @@ const Demo = {
       reminders: [{ due: Date.now() / 1000 + 900, text: "Stretch" }, { due: Date.now() / 1000 + 3600, text: "Call the tailor" }],
       memory: ["The user prefers tea over coffee.", "Main project: the portfolio site.", "Prefers metric units."],
       agenda: [{ task: "Submit the DBMS assignment", due: "Fri 13 Nov 05:00 PM" }, { task: "Renew the domain", due: "today", overdue: false }],
-      spent_today: 240, spent_month: 6850 });
+      spent_today: 240, spent_month: 6850,
+      study: { session: null, focus_today: 50, exams: [{ subject: "DBMS", days: 12 }, { subject: "Operating Systems", days: 3 }],
+               decks: [{ subject: "DBMS", cards: 20, due: 6, quiz: 10 }] },
+      wellbeing: { water_today: 3, active_minutes: 42 } });
     addEntry("user", "Sebas, how are my deployments?");
     addEntry("sebas", "All three deployments are healthy, sir. The portfolio was published to production four minutes ago.");
     addEntry("notice", "Listening. Say “Sebas, rise”, or ring the bell.");

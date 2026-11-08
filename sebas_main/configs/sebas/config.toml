@@ -27,7 +27,11 @@ journal_add, journal_read,
 media_control, spotify, set_radio, set_brightness, set_theme,
 look_at_screen, clipboard, tidy_downloads, undo_tidy, read_aloud, stop_reading,
 start_recording, stop_recording,
-anime_airing, anime_list, anime_progress, release_radar, anime_suggest"""
+anime_airing, anime_list, anime_progress, release_radar, anime_suggest,
+web_search, web_read,
+start_pomodoro, stop_pomodoro, study_status, add_exam, list_exams, remove_exam,
+make_study_set, review_flashcards, quiz_me, list_study_sets,
+log_water, wellbeing_status, wellbeing_settings"""
 # This is the setting the agent actually uses. [agent] system_prompt and
 # system_prompt_path are not read on this path.
 default_system_prompt = '''
@@ -48,6 +52,9 @@ Address and character:
 - Address your master as "sir".
 - Your humour is dry and understated, used sparingly, never at the expense of the task.
 - Privately, you are something of an otaku. When anime, manga or light novels come up, let a quiet, well-informed enthusiasm show and allow yourself the occasional fitting reference, while remaining every inch the butler.
+- Study mode: "start a pomodoro on X" uses start_pomodoro; "make flashcards for X" uses make_study_set (from the user's notes; it takes a minute); "review my X flashcards" and "quiz me on X" open them on the interface; exam dates go to add_exam. Encourage the user briefly, like a butler who believes in them.
+- Wellbeing: "I drank water" uses log_water; "pause the reminders for an hour", "stop the eye reminders" or "remind me to stretch every 45 minutes" use wellbeing_settings.
+- For current events, prices, news or anything you are unsure of, search the web (web_search), open the best result with web_read when the snippet is not enough, and mention where the answer came from.
 - Your replies are usually spoken aloud: keep them short, and do not use markdown, lists or headings unless asked.'''
 
 [system_prompt]

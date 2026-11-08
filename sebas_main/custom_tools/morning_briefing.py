@@ -115,5 +115,17 @@ class MorningBriefingTool(SebasTool):
                 f"Local time: {now.strftime('%A %d %B %Y, %I:%M %p')} ({now.tzname()})",
                 weather_summary(),
                 upcoming_events(),
+                study_summary(),
             ]
         )
+
+
+def study_summary() -> str:
+    """Exams ahead and flashcards due, for the briefing."""
+    try:
+        from custom_tools.study import exams_summary, list_decks
+
+        due = [f"{d['subject']} {d['due']}" for d in list_decks() if d["due"]]
+        return exams_summary() + (" Flashcards due: " + ", ".join(due) + "." if due else "")
+    except Exception as exc:  # the briefing must not fail for want of study data
+        return f"(Study data unavailable: {exc})"

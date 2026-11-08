@@ -21,7 +21,7 @@ import sounddevice as sd
 from sebas_events import emit
 from voice_pipeline.ears import Ears
 
-logger = logging.getLogger(__name__)
+logger = logging.getLogger("sebas.voice")
 
 NAME = "sebas"
 # Spellings Whisper produces for "Sebas" that plain similarity would miss.
@@ -44,6 +44,25 @@ def _norm(word: str) -> str:
 
 def _is_name(candidate: str) -> bool:
     return candidate in _ALIASES or SequenceMatcher(None, candidate, NAME).ratio() >= 0.8
+
+
+# What the quick model makes of "Sebas" when it gets it wrong (heard in testing:
+# "Service, watch the writer today."). Such a first word is not taken as the name
+# by itself; it earns a second listen by the accurate model.
+_NEAR_MISSES = {"service", "servis", "savas", "sabbath", "seabass", "seabus", "subas", "zebras",
+                "zebra", "sebastian", "seb", "sabis", "cebus", "sevis", "serbus", "sebis", "thebes"}
+
+
+def sounds_like_name(text: str) -> bool:
+    """True when ``text`` opens with something close to "Sebas" without being it."""
+    words = [_norm(w) for w in text.split()]
+    words = [w for w in words if w]
+    while words and words[0] in _FILLERS:
+        words = words[1:]
+    if not words:
+        return False
+    one, two = words[0], words[0] + (words[1] if len(words) > 1 else "")
+    return one in _NEAR_MISSES or two in _NEAR_MISSES or SequenceMatcher(None, one, NAME).ratio() >= 0.6
 
 
 def split_address(text: str) -> str | None:
@@ -109,8 +128,9 @@ class PushToTalk(Exception):
 class NameListener:
     """Waits until someone says a sentence starting with "Sebas"."""
 
-    def __init__(self, ears: Ears, silence_threshold: int) -> None:
+    def __init__(self, ears: Ears, silence_threshold: int, confirm: Ears | None = None) -> None:
         self._ears = ears
+        self._confirm = confirm  # the accurate model: a second opinion on near-misses
         self._threshold = silence_threshold
         self._push_to_talk = threading.Event()
 
@@ -123,6 +143,7 @@ class NameListener:
         pre_roll: collections.deque = collections.deque(maxlen=_PRE_ROLL_FRAMES)
         frames: list[np.ndarray] = []
         loud = quiet = 0
+        shown = -1.0  # the mic level the interface last received
         while True:
             if self._push_to_talk.is_set():
                 self._push_to_talk.clear()
@@ -130,7 +151,12 @@ class NameListener:
             frame, _ = stream.read(_FRAME)
             frame = frame[:, 0].copy()
             rms = float(np.sqrt(np.mean(frame.astype(np.float64) ** 2)))
-            emit("mic", level=min(1.0, rms / (self._threshold * 8)))
+            # In tenths, and only when it changes: silence costs the interface nothing
+            # (this once sent 12 updates a second, all day long).
+            level = round(min(1.0, rms / (self._threshold * 8)), 1)
+            if level != shown:
+                shown = level
+                emit("mic", level=level)
             is_loud = rms >= self._threshold
             if not frames:
                 pre_roll.append(frame)
@@ -161,8 +187,16 @@ class NameListener:
                     return None, ""
                 # "Sebas" always comes first, so only the opening seconds need
                 # checking: long background speech (TV, a call) costs far less.
-                text = self._ears.transcribe(pcm[: _RATE * _NAME_CHECK_SECONDS])
+                opening = pcm[: _RATE * _NAME_CHECK_SECONDS]
+                text = self._ears.transcribe(opening)
                 remainder = split_address(text)
+                if remainder is None and self._confirm is not None and sounds_like_name(text):
+                    # "Service, ..." may well be "Sebas, ...": let the accurate model decide
+                    second = self._confirm.transcribe(opening)
+                    remainder = split_address(second)
+                    logger.info("Near-miss %r re-checked as %r: %s", text, second,
+                                "addressed" if remainder is not None else "not addressed")
                 if remainder is not None:
+                    logger.info("Woke on %r (%.1f s of speech)", text, pcm.size / _RATE)
                     return pcm, remainder
-                logger.debug("Not addressed to Sebas: %r", text)
+                logger.debug("Not addressed to Sebas: %r", text)  # other speech is not kept in the log

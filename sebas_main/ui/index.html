@@ -40,6 +40,15 @@
 <!-- Steins;Gate divergence meter -->
 <div id="divergence" aria-hidden="true"><div class="tubes"></div><div class="dm-caption">Worldline divergence · El Psy Kongroo</div></div>
 
+<!-- The Games Room: hard-coded games, no AI -->
+<div id="games" aria-hidden="true">
+  <div class="game-frame panel">
+    <div class="game-head"><button id="game-menu-btn" class="game-btn">‹ Games</button><h2 id="game-title" class="panel-title"><span>The Games Room</span></h2><button id="game-close" class="game-btn">✕</button></div>
+    <div class="game-bubble"><b>Sebas</b><span id="game-bubble">…</span></div>
+    <div id="game-body"></div>
+  </div>
+</div>
+
 <!-- Title bar -->
 <header class="titlebar">
   <div class="drag pywebview-drag-region">
@@ -83,6 +92,20 @@
     <div class="reticle"><i></i><i></i><i></i><i></i></div>
     <div class="telemetry" id="telemetry">
       Unit <b>S-01</b><br>Voice <b id="tel-voice">—</b><br>Mind <b id="tel-mind">—</b>
+    </div>
+
+    <!-- Wellbeing nudge: break, water, or the 20-20-20 eye cue -->
+    <div id="nudge" role="status">
+      <div class="nudge-icon" id="nudge-icon"></div>
+      <div class="nudge-body"><b id="nudge-title">A word, sir</b><span id="nudge-line"></span></div>
+      <div class="nudge-actions"><button id="nudge-water" class="game-btn">Drank a glass</button><button id="nudge-ok" class="game-btn">Very well</button></div>
+    </div>
+
+    <!-- Pomodoro: shown only during a study session -->
+    <div id="pomo" aria-live="polite">
+      <svg viewBox="0 0 60 60"><circle cx="30" cy="30" r="26" class="track"/><circle id="pomo-ring" cx="30" cy="30" r="26" class="bar"/></svg>
+      <div class="pomo-text"><span id="pomo-label">Focus</span><b id="pomo-time">25:00</b><span id="pomo-round">Round 1 of 4</span></div>
+      <button id="pomo-stop" class="game-btn" title="Stop the session">Stop</button>
     </div>
 
     <div class="avatar-wrap">
@@ -311,6 +334,12 @@
       <h3 class="sub">The Agenda</h3>
       <ul class="list" id="agenda"><li class="empty">The agenda is clear.</li></ul>
 
+      <h3 class="sub">Study <small id="focus-today"></small></h3>
+      <ul class="list" id="study"><li class="empty">No exams or study sets yet.</li></ul>
+
+      <h3 class="sub">Wellbeing</h3>
+      <div class="accounts"><span>Water</span><b id="well-water">0</b><span>At it for</span><b id="well-active">0 min</b></div>
+
       <h3 class="sub">Accounts</h3>
       <div class="accounts"><span>Today</span><b id="spent-today">₹0</b><span>This month</span><b id="spent-month">₹0</b></div>
 
@@ -337,6 +366,7 @@
     <button data-ask="How are my Vercel deployments?">Deployments</button>
     <button data-ask="Anything new on GitHub?">GitHub</button>
     <button data-ask="How is my laptop doing?">System Status</button>
+    <button data-game>Games</button>
   </div>
   <form class="bellbar" id="bell-form" autocomplete="off">
     <button type="button" id="bell" title="Ring the bell to speak">
@@ -350,5 +380,8 @@
 </footer>
 
 <script src="app.js"></script>
+<script src="games.js"></script>
+<script src="study.js"></script>
+<script src="wellbeing.js"></script>
 </body>
 </html>

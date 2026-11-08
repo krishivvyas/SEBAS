@@ -295,3 +295,29 @@ class StopRecordingTool(SebasTool):
         length = f"{minutes:.0f} minutes" if minutes >= 1.5 else "under a minute" if minutes < 1 else "a minute"
         return (f"Stopped after {length}. I am transcribing it on the laptop, which takes about "
                 f"{estimate} minute{'s' if estimate != 1 else ''}, and shall tell you when the notes are ready.")
+
+
+@ToolRegistry.register("web_read")
+class WebReadTool(SebasTool):
+    name = "web_read"
+    description = (
+        "Open a web page and return its readable text, to answer from the full page rather "
+        "than a search snippet. Typically used after web_search on the most relevant result."
+    )
+    parameters = {
+        "type": "object",
+        "properties": {"url": {"type": "string", "description": "The page's full URL."}},
+        "required": ["url"],
+    }
+    timeout_seconds = 45.0
+
+    def run(self, url: str) -> str:
+        url = url.strip()
+        if not url.startswith(("http://", "https://")):
+            raise ToolError("That is not a web address.")
+        title, text = text_from_web(url)
+        if not text.strip():
+            raise ToolError("The page had no readable text (it may need JavaScript or a login).")
+        limit = 12_000
+        clipped = f"\n\n(The page continues; this is the first {limit:,} characters.)" if len(text) > limit else ""
+        return f"{title}\n\n{text[:limit]}{clipped}"

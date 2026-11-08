@@ -50,6 +50,25 @@ def handle_egg(text: str, mouth=None) -> bool:
     return True
 
 
+def handle_game(text: str, mouth=None) -> bool:
+    """"Sebas, let's play pong": open the Games Room. True if it was a game request."""
+    import sebas_games
+
+    found = sebas_games.check(text)
+    if found is None:
+        return False
+    name, line = found
+    sebas_games.open_game(name)
+    print(f"Sebas: {line}", flush=True)
+    emit("transcript", role="sebas", text=line)
+    if mouth is not None and name is None:  # each game greets you itself
+        try:
+            mouth.speak(line)
+        except Exception:
+            logger.exception("Speech output failed")
+    return True
+
+
 class SebasSleep(Exception):
     """Raised when the user sends Sebas to sleep."""
 
@@ -106,7 +125,7 @@ def run_voice_turn(listener, ears, mouth, brain, follow_up_seconds: float = 0.0)
         if is_sleep_request(text):
             say_farewell(mouth)
             raise SebasSleep
-        if not handle_egg(text, mouth):
+        if not handle_egg(text, mouth) and not handle_game(text, mouth):
             emit("state", state="thinking")
             try:
                 reply = brain.ask(text)
@@ -152,7 +171,7 @@ def load_voice():
     quick_ears.load()
     ears = Ears(os.environ.get("SEBAS_WHISPER_MODEL") or "small.en", threshold)
     ears.load()
-    listener = NameListener(quick_ears, threshold)
+    listener = NameListener(quick_ears, threshold, confirm=ears)
     mouth = Mouth(voice=os.environ.get("SEBAS_VOICE") or "bm_george")
     mouth.load()
     return listener, ears, mouth
@@ -227,12 +246,12 @@ def run_text(brain) -> None:
             print(f"Sebas: {_FAILURE_REPLY}")
 
 
-def mic_test(seconds: int = 6) -> None:
+def mic_test(seconds: int = 8) -> None:
     import numpy as np
     import sounddevice as sd
 
     rate = 16000
-    print(f"Recording for {seconds} seconds. Stay quiet for 3, then speak normally.")
+    print(f"Recording for {seconds} seconds. Stay quiet for 3, then say: \"Sebas, what is the weather today?\"", flush=True)
     audio = sd.rec(seconds * rate, samplerate=rate, channels=1, dtype="int16")
     sd.wait()
     samples = audio[:, 0].astype(np.float64)
@@ -242,10 +261,71 @@ def mic_test(seconds: int = 6) -> None:
     speech = float(levels[levels.size // 2 :].max())
     print(f"Background level: {noise:.0f}")
     print(f"Speech peak:      {speech:.0f}")
+    current = os.environ.get("SEBAS_SILENCE_THRESHOLD", "").strip()
     if speech < noise * 2:
         print("Speech is barely louder than the background. Check the microphone.")
     else:
-        print(f"Suggested .env setting: SEBAS_SILENCE_THRESHOLD={(noise + speech) / 2:.0f}")
+        suggested = (noise + speech) / 2
+        print(f"Suggested .env setting: SEBAS_SILENCE_THRESHOLD={suggested:.0f}"
+              + (f" (currently {current})" if current else ""))
+
+    # What Sebas would make of it: the quick model decides whether he was addressed,
+    # the accurate one reads the request (the same two steps as in voice mode).
+    from voice_pipeline.ears import Ears
+    from voice_pipeline.name_listener import request_text, split_address
+
+    spoken = audio[rate * 2 :, 0]
+    print("Transcribing what you said...", flush=True)
+    import wave
+    from pathlib import Path
+
+    from voice_pipeline.name_listener import sounds_like_name
+
+    saved = Path.home() / ".openjarvis" / "sebas" / "logs" / "mic-test.wav"
+    saved.parent.mkdir(parents=True, exist_ok=True)
+    with wave.open(str(saved), "wb") as w:
+        w.setnchannels(1); w.setsampwidth(2); w.setframerate(rate); w.writeframes(audio.tobytes())  # noqa: E702
+    print(f"(Recording saved to {saved})")
+
+    threshold = int(float(current or 500))
+    quick = Ears(os.environ.get("SEBAS_NAME_MODEL") or "tiny.en", threshold)
+    accurate = Ears(os.environ.get("SEBAS_WHISPER_MODEL") or "small.en", threshold)
+    opening = spoken[: rate * 3]  # voice mode checks the first 3 seconds for the name
+    heard = quick.transcribe(opening)
+    address = split_address(heard)
+    print(f"  quick model    heard {heard!r}")
+    if address is None and sounds_like_name(heard):
+        second = accurate.transcribe(opening)
+        address = split_address(second)
+        print(f"  near-miss, so the accurate model re-checked: {second!r}")
+    if address is None:
+        print("  -> NOT addressed to Sebas: he would not wake. Try again a little closer or clearer.")
+        return
+    print(f"  -> addressed to Sebas. Request (accurate model): {request_text(split_address(accurate.transcribe(spoken)) or address)!r}")
+
+
+def setup_logging() -> str:
+    """Warnings to the console, as before; and a rotating log file (three files of
+    1 MB, in ~/.openjarvis/sebas/logs) that also keeps Sebas's own INFO lines, so a
+    problem can be looked into after the window has closed. Returns its path."""
+    from logging.handlers import RotatingFileHandler
+    from pathlib import Path
+
+    folder = Path.home() / ".openjarvis" / "sebas" / "logs"
+    folder.mkdir(parents=True, exist_ok=True)
+    path = folder / "sebas.log"
+    console = logging.StreamHandler()
+    console.setLevel(logging.WARNING)
+    handlers: list[logging.Handler] = [console]
+    try:
+        log_file = RotatingFileHandler(path, maxBytes=1_000_000, backupCount=3, encoding="utf-8", delay=True)
+        log_file.setFormatter(logging.Formatter("%(asctime)s %(levelname)-7s %(name)s: %(message)s"))
+        handlers.append(log_file)
+    except OSError:
+        pass  # a log file is a convenience, never a reason not to start
+    logging.basicConfig(level=logging.WARNING, handlers=handlers, force=True)
+    logging.getLogger("sebas").setLevel(logging.INFO)  # only Sebas's INFO, not every library's
+    return str(path)
 
 
 def main() -> int:
@@ -258,9 +338,18 @@ def main() -> int:
     parser.add_argument(
         "--mic-test", action="store_true", help="measure microphone levels and exit"
     )
+    parser.add_argument(
+        "--selftest", action="store_true", help="run Sebas's offline tests and exit"
+    )
     args = parser.parse_args()
 
-    logging.basicConfig(level=logging.WARNING)
+    if args.selftest:  # before the log file: simulated failures do not belong in it
+        import unittest
+
+        logging.basicConfig(level=logging.ERROR)
+        suite = unittest.defaultTestLoader.discover(os.path.join(os.path.dirname(__file__), "sebas_tests"))
+        return 0 if unittest.TextTestRunner(verbosity=2).run(suite).wasSuccessful() else 1
+    setup_logging()
     if args.mic_test:
         mic_test()
         return 0

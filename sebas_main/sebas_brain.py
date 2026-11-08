@@ -44,6 +44,7 @@ _RATE_LIMIT_REST_SECONDS = 65
 _BAD_KEY_REST_SECONDS = 3600
 _LOCAL_CONTEXT_TOKENS = "8192"
 _GEMINI_TIMEOUT_MS = 30_000
+_LITE_LADDER_SIZE = 3
 _MODEL_LADDER_SIZE = 5  # each model has its own free-tier daily quota
 _BUSY_REST_SECONDS = 15 * 60  # doubles on each repeat, up to _BUSY_REST_MAX
 _BUSY_REST_MAX = 2 * 3600
@@ -77,7 +78,13 @@ def choose_gemini_models(api_key: str) -> list[str]:
     return [pinned] + [m for m in ladder if m != pinned] if pinned else ladder
 
 
-def _stable_flash_models(api_key: str) -> list[str]:
+def choose_lite_models(api_key: str) -> list[str]:
+    """Flash-Lite models, newest first: lighter, but with much higher free daily
+    limits, so they keep Sebas on Gemini after the Flash quotas are spent."""
+    return _stable_flash_models(api_key, lite=True)[:_LITE_LADDER_SIZE]
+
+
+def _stable_flash_models(api_key: str, lite: bool = False) -> list[str]:
     try:
         from google import genai
 
@@ -89,7 +96,9 @@ def _stable_flash_models(api_key: str) -> list[str]:
             actions = getattr(model, "supported_actions", None) or []
             if "flash" not in name or (actions and "generateContent" not in actions):
                 continue
-            if re.search(r"lite|image|tts|live|audio|embed|thinking|exp|preview|latest|\d{3,}$", name):
+            if ("flash-lite" in name) != lite:
+                continue
+            if re.search(r"image|tts|live|audio|embed|thinking|exp|preview|latest|\d{3,}$", name):
                 continue
             names.append(name)
         return sorted(set(names), key=_version, reverse=True)
@@ -132,9 +141,14 @@ def classify_failure(exc: BaseException) -> tuple[str, float] | None:
         if api.code == 429 or "RESOURCE_EXHAUSTED" in text:
             # Google states when the quota frees up; trust that over our guess.
             delay = re.search(r"retryDelay'?\"?:\s*'?\"?(\d+(?:\.\d+)?)s", text)
-            if re.search(r"per ?day|PerDay|daily", text, re.IGNORECASE):
-                return "quota-day", float(delay.group(1)) if delay else _until_pacific_midnight()
-            return "quota-minute", float(delay.group(1)) + 2 if delay else _RATE_LIMIT_REST_SECONDS
+            if delay:
+                # Trust Google's own retry delay: a per-minute error can also list the
+                # daily quota among its details, which once rested models for a day.
+                seconds = float(delay.group(1))
+                return ("quota-day", seconds) if seconds > 3600 else ("quota-minute", seconds + 2)
+            if re.search(r"PerDay|per day", text, re.IGNORECASE) and not re.search(r"PerMinute|per minute", text, re.IGNORECASE):
+                return "quota-day", _until_pacific_midnight()
+            return "quota-minute", _RATE_LIMIT_REST_SECONDS
         if api.code in (401, 403) or re.search(r"API key|PERMISSION_DENIED|UNAUTHENTICATED", text):
             return "bad-key", _BAD_KEY_REST_SECONDS
         if api.code >= 500:  # 503 high demand, 504 deadline exceeded
@@ -192,20 +206,29 @@ def _tool_models() -> dict[str, int]:
     return found
 
 
-def choose_local_model() -> str:
-    """SEBAS_LOCAL_MODEL if set, else the best-ranked installed model."""
-    if chosen := os.environ.get("SEBAS_LOCAL_MODEL", "").strip():
-        return chosen
+def choose_local_models() -> list[str]:
+    """Installed tool-capable models, best first: the benchmark's ranking, then the
+    rest by size. SEBAS_LOCAL_MODEL, if set, goes first."""
     ensure_ollama()
     available = _tool_models()
-    if not available:
+    pinned = os.environ.get("SEBAS_LOCAL_MODEL", "").strip()
+    if not available and not pinned:
         raise RuntimeError(
             "No installed Ollama model supports tool calling. Try: ollama pull qwen2.5"
         )
-    for name in LOCAL_MODEL_PREFERENCE:
-        if name in available:
-            return name
-    return max(available, key=available.get)  # unranked: the largest is usually best
+    ranked = [m for m in LOCAL_MODEL_PREFERENCE if m in available]
+    ranked += sorted((m for m in available if m not in ranked), key=available.get, reverse=True)
+    return [pinned] + [m for m in ranked if m != pinned] if pinned else ranked
+
+
+def choose_local_model() -> str:
+    return choose_local_models()[0]
+
+
+def local_model_failed(exc: BaseException) -> bool:
+    """True when Ollama could not run the model (often too little free memory)."""
+    text = str(exc).lower()
+    return any(s in text for s in ("model runner", "resource", "out of memory", "memory", "500"))
 
 
 # ---------------------------------------------------------------------------
@@ -214,8 +237,10 @@ def choose_local_model() -> str:
 
 @dataclass
 class Provider:
-    label: str              # shown to the user: "Gemini key 1", "local"
+    label: str              # shown to the user: "Gemini key 1", "Gemini key 1 (lite)", "local"
     api_key: str = ""       # empty for the local model
+    key_number: int = 0
+    lite: bool = False      # the Flash-Lite tier of a key
     models: list[str] = field(default_factory=list)  # Gemini ladder, best first; or [local model]
     rested_until: float = 0.0
     busy_until: dict[str, float] = field(default_factory=dict)
@@ -268,7 +293,11 @@ class Brain:
         self._shown: tuple[str, str] | None = None  # (provider, model) last announced
 
         keys = [os.environ.get("GEMINI_API_KEY", "").strip(), os.environ.get("GEMINI_API_KEY_2", "").strip()]
-        self.providers = [Provider(f"Gemini key {i}", k) for i, k in enumerate(keys, 1) if k]
+        # Full Flash on each key first, then each key's Flash-Lite tier (much higher
+        # free limits), then the local model.
+        numbered = [(i, k) for i, k in enumerate(keys, 1) if k]
+        self.providers = [Provider(f"Gemini key {i}", k, key_number=i) for i, k in numbered]
+        self.providers += [Provider(f"Gemini key {i} (lite)", k, key_number=i, lite=True) for i, k in numbered]
         self.providers.append(Provider("local"))
         self._restore_spent_models()
         self.current: Provider | None = None
@@ -318,13 +347,16 @@ class Brain:
     # --- provider selection ------------------------------------------------
     def _select(self, reason: str | None = None) -> None:
         """Use the highest-priority provider that is not resting."""
+        for p in self.providers:
+            # Load a key's model list before judging it: with every model on it
+            # resting (e.g. yesterday's spent quotas, remembered), it is not usable.
+            if not p.is_local and not p.models and time.monotonic() >= p.rested_until:
+                p.models = choose_lite_models(p.api_key) if p.lite else choose_gemini_models(p.api_key)
         chosen = next(p for p in self.providers if p.available() or p.is_local)
         if chosen.is_local:
             if not chosen.models:
-                chosen.models = [choose_local_model()]
+                chosen.models = choose_local_models()
             self._start_local_keepalive(chosen, warm_up=reason is not None and self.current is None)
-        elif not chosen.models:
-            chosen.models = choose_gemini_models(chosen.api_key)
         if (chosen.label, chosen.model) == self._shown:
             return
         self._shown = (chosen.label, chosen.model)
@@ -351,7 +383,7 @@ class Brain:
     @property
     def short_description(self) -> str:
         p = self.current
-        return p.model if p.is_local else f"{p.model} · key {p.label[-1]}"
+        return p.model if p.is_local else f"{p.model} · key {p.key_number}"
 
     # --- building the orchestrator per provider ------------------------------
     def _system(self, provider: Provider):
@@ -463,6 +495,7 @@ class Brain:
         from openjarvis.core.types import Message, Role
 
         self._select()  # a rested higher-priority provider takes back over
+        started_on = self.current
         notes = []
         while True:
             provider = self.current
@@ -472,7 +505,16 @@ class Brain:
                 provider.busy_strikes.pop(model, None)
                 break
             except Exception as exc:
-                failure = None if provider.is_local else classify_failure(exc)
+                if provider.is_local:
+                    # Ollama could not run this model, usually for want of memory: try a smaller one
+                    if local_model_failed(exc) and len([m for m in provider.models if provider.busy_until.get(m, 0) <= time.monotonic()]) > 1:
+                        logger.warning("Local model %s failed (%s); trying a smaller one", model, str(exc)[:120])
+                        provider.busy_until[model] = time.monotonic() + 600
+                        self._select(reason=f"{model} could not run (low memory?)")
+                        notes.append(f"The local model {model} could not run, so I am using a lighter one.")
+                        continue
+                    raise
+                failure = classify_failure(exc)
                 if failure is None:
                     raise
                 kind, rest = failure
@@ -494,8 +536,7 @@ class Brain:
                         if not p.is_local:
                             p.rested_until = max(p.rested_until, provider.rested_until)
                 self._select(reason=f"{provider.label} {_REASONS[kind]}")
-                nxt = self.current.label if not self.current.is_local else "the local model"
-                notes.append(f"{provider.label} {_REASONS[kind]}, so I have moved to {nxt}.")
+
 
         if reply:
             self._history += [
@@ -503,6 +544,13 @@ class Brain:
                 Message(role=Role.ASSISTANT, content=reply),
             ]
             del self._history[:-_MAX_HISTORY_MESSAGES]
+        # One short spoken sentence, and only when Sebas dropped a tier (switching
+        # keys is silent; the console and interface still show every switch).
+        if self.current is not started_on and not notes:
+            if self.current.is_local:
+                notes.append("Gemini is unavailable just now, sir, so I am answering with the local model.")
+            elif self.current.lite and not started_on.lite:
+                notes.append("Today's Gemini quota is spent, sir, so I am using a lighter model.")
         return (" ".join(notes) + " " + reply).strip() if notes else reply
 
     def close(self) -> None:

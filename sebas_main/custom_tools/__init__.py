@@ -16,4 +16,6 @@ from custom_tools import (  # noqa: F401
     memory,
     morning_briefing,
     notes,
+    study,
+    wellbeing,
 )

@@ -158,7 +158,7 @@ class SebasApp:
                 run_sebas.say_farewell(self.mouth)
                 self._retire()
                 return
-            if run_sebas.handle_egg(text, self.mouth):
+            if run_sebas.handle_egg(text, self.mouth) or run_sebas.handle_game(text, self.mouth):
                 continue
             emit("state", state="thinking")
             try:
@@ -208,7 +208,7 @@ class SebasApp:
         return True
 
     def snapshot(self) -> dict[str, Any]:
-        from custom_tools import household, laptop, memory
+        from custom_tools import household, laptop, memory, study, wellbeing
         from custom_tools.household import describe_due
 
         with laptop._reminders_lock:
@@ -228,6 +228,8 @@ class SebasApp:
             "spent_month": household.expense_totals("month")[0],
             "spent_today": household.expense_totals("today")[0],
             "voice": bool(self.voice and self.listener is not None),
+            "study": study.snapshot(),
+            "wellbeing": wellbeing.WELLBEING.status(),
         }
 
 
@@ -249,6 +251,57 @@ class Api:
 
     def push_to_talk(self) -> bool:
         return self._app.push_to_talk()
+
+    def say(self, line: str) -> None:
+        """A scripted game line: spoken in Sebas's voice, no Gemini involved."""
+        mouth = self._app.mouth
+        if mouth is None or not line:
+            return
+
+        def talk() -> None:
+            try:
+                mouth.speak_if_free(str(line)[:300])
+            except Exception:
+                logger.exception("Speech output failed")
+
+        threading.Thread(target=talk, daemon=True).start()
+
+    # --- study mode: flashcards and quizzes run in the page, from saved sets ---
+    def study_deck(self, subject: str) -> dict[str, Any]:
+        from custom_tools import study
+
+        return study.deck_for_review(subject)
+
+    def study_grade(self, subject: str, card_id: str, verdict: str) -> None:
+        from custom_tools import study
+
+        if verdict in ("again", "good", "easy"):
+            study.grade(subject, card_id, verdict)
+
+    def study_quiz(self, subject: str) -> dict[str, Any]:
+        from custom_tools import study
+
+        return study.quiz_for(subject)
+
+    def study_quiz_done(self, subject: str, score: int, total: int) -> None:
+        from custom_tools import study
+
+        study.record_quiz(subject, int(score), int(total))
+
+    def log_water(self) -> int:
+        from custom_tools import wellbeing
+
+        return wellbeing.log_water(1)
+
+    def set_gaming(self, on: bool) -> None:
+        from custom_tools import wellbeing
+
+        wellbeing.set_gaming(on)  # no spoken nudges mid-game
+
+    def study_stop(self) -> None:
+        from custom_tools import study
+
+        study.StopPomodoroTool().run_now()
 
     def minimize(self) -> None:
         self._app.bridge.window.minimize()

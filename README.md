@@ -53,7 +53,7 @@ flowchart TD
     subgraph Intelligence["🧠 Cognitive Engine"]
         STT --> Brain["OpenJarvis Orchestrator\n20-message history + MEMORY.md"]
         STT2 --> Brain
-        Brain <--> Gemini["Gemini Flash\nkey 1, then key 2"]
+        Brain <--> Gemini["Gemini Flash (key 1, key 2)\nthen Flash-Lite (key 1, key 2)"]
         Brain <-. "no key / offline" .-> Local["Local model via Ollama\n(best installed, auto-picked)"]
         Brain <--> Tools["custom_tools/\n• Vercel & AWS (read-only)\n• GitHub\n• Steam & Bookswagon\n• Morning briefing + Google Calendar\n• Laptop actions (allowlist)"]
     end
@@ -82,7 +82,14 @@ flowchart TD
 - **Screen, clipboard and files**: *"What's this error on my screen?"* (a screenshot, taken only when you ask and read by Gemini's vision); *"summarise / translate / explain what I copied"*, with results put back on the clipboard; *"tidy my Downloads"* (shows the plan, moves nothing until you agree, can be undone; files from the last ten minutes and unfinished downloads are left alone).
 - **Reading and notes**: *"read this article aloud"* (web pages, PDFs, the clipboard; *"stop reading"* ends it); *"start recording the DBMS lecture"* … *"stop recording"*: the recording is transcribed on the laptop with Whisper, summarised by Gemini (outside the conversation), and saved with key points, action items and the full transcript to *Documents › Sebas Notes*.
 - **Anime life (AniList)**: *"what airs today?"* (your watching and planning list, in local time), *"what am I watching?"*, *"I finished episode 7 of Frieren"* (updates AniList), *"anything new on my list?"* (new episodes, chapters and light-novel volumes; also checked every 30 minutes and announced, and posted to Discord), and *"suggest something short and funny"* (recommendations from what you rated highly).
+- **Web search**: *"Sebas, who won the last F1 race?"* searches DuckDuckGo (no key needed) and, when a snippet isn't enough, opens the best result and reads the page (`web_search`, `web_read`).
 - **Anime Easter eggs** (matched on the laptop: instant, no Gemini quota): *"Ainz Ooal Gown"* toggles Nazarick mode (crimson interface, Sebas Tian); *"El Psy Kongroo"* shows a nixie-tube divergence meter settling on 1.048596; *"Are you merely a butler?"* gives crimson demon eyes and *"I am simply one hell of a butler"*; *"What's your power level?"* spikes and cracks the gauges (*over nine thousand*); *"Sharingan"* gives spinning tomoe eyes; the Konami code (up up down down left right left right B A) in the interface switches to Sebas Tian's attire. On Discord you get his line without the visuals.
+- **Study mode**:
+  - *"Sebas, start a pomodoro on DBMS"*: 25-minute focus blocks and 5-minute breaks (both adjustable), four rounds, with a ring timer on the stage and spoken cues ("Even Saitama rests between push-ups"). While you focus he is a **quiet butler**: non-urgent alerts and the briefings wait and are told together at the break, while deadlines, meetings and battery warnings still come through. Focus time is totalled per subject and day.
+  - *"Make flashcards for DBMS"* reads your notes (Documents › Sebas Notes, matched by subject, or any .md/.txt/.pdf you name) and asks Gemini **once**, in JSON mode, for flashcards and multiple-choice questions. They are saved in `~/.openjarvis/sebas/study/`, so *"review my DBMS flashcards"* (spaced repetition with Leitner boxes: Again / Good / Easy) and *"quiz me on DBMS"* run offline with no quota. Remaking a set keeps your progress on unchanged cards. Due cards show in the Household panel with one-click **Review** and **Quiz** buttons.
+  - *"My DBMS exam is on 20 November"*: a countdown in the Household panel and in the morning briefing (with the flashcards due), and a word a week, three days and a day before, then good luck on the day.
+- **Wellbeing butler** (from keyboard and mouse activity, no camera): after about an hour without a break, a short spoken nudge to stand and stretch (again half an hour later if ignored; five minutes away counts as a break); every 90 minutes at the laptop, *"a glass of water, sir?"* (*"I drank water"* or the card's button logs a glass, counted in the Household panel); and every 20 minutes a silent on-screen 20-20-20 card with a 20-second countdown. Nudges never come while you are away, in a Pomodoro focus block, in a game, or with a full-screen app (a film, a presentation, a game), and never go to Discord. *"Pause the reminders for an hour"*, *"stop the eye reminders"*, *"remind me to stretch every 45 minutes"*.
+- **The Games Room** (built in, no AI and no quota): *"Sebas, let's play tic-tac-toe"*, *"pong"*, *"rock paper scissors"*, *"a memory game"*, *"anime trivia"*, *"connect four"*, *"hangman"*, *"play snake"*, or *"I'm bored"* (or press **Games**). Tic-tac-toe has a beatable *Butler* level and a perfect *Nazarick* level (minimax, verified unbeatable over every possible game); Connect Four has the same two levels (alpha-beta search; *Nazarick* won 40 of 40 test games against an opponent that always takes or blocks a win, *Butler* about 80%); in pong Sebas's paddle chases the ball with a capped speed; trivia draws ten of 24 anime questions; anime hangman hides 26 titles and characters behind a lantern that dims with each miss (a hint after three); Snake speeds up as it grows, waits for your first key, and keeps your high score. Sebas's commentary is scripted for each moment (opening, good move, your point, his point, win, lose, draw) with anime references, from *"All according to keikaku"* to *"Za Warudo"*, and spoken in his own voice. The stage's animations pause while a game is open.
 - **Seasons**: the ambient layer shows sakura in spring, fireflies on summer nights, falling leaves in autumn and snow in winter.
 - **"Sebas, sleep"** (or *"good night"*, *"that will be all"*): a time-appropriate farewell, then he shuts down.
 - **Discord, from your phone**: a private bot in your own server that sets itself up (a *Sebas* category visible only to you, with `#sebas`, `#alerts`, `#briefings`, `#ledger`, a live `#status`, and a read-only `#commands` guide he keeps current). Chat with him in `#sebas`; alerts and briefings are always logged there and are spoken aloud only when you're at the laptop; when you're away the evening check-in happens on Discord. Laptop actions asked for from Discord never run until you reply **yes**, and he won't be sent to sleep from there (nothing could wake him again).
@@ -105,8 +112,9 @@ flowchart TD
   | System | `set_radio` (Wi-Fi, Bluetooth), `set_brightness`, `set_theme` (dark/light) | Minor settings only, no admin |
   | Screen & files | `look_at_screen`, `clipboard`, `tidy_downloads`, `undo_tidy` | Screenshot only on request; tidy only after a yes |
   | Reading & notes | `read_aloud`, `stop_reading`, `start_recording`, `stop_recording` | Notes saved to *Documents › Sebas Notes* |
+  | Web | `web_search` (DuckDuckGo), `web_read` | Read-only |
   | Anime | `anime_airing`, `anime_list`, `anime_progress`, `release_radar`, `anime_suggest` | Updates only your AniList list |
-- **Never runs dry**: Gemini key 1 → Gemini key 2 → a local model. Each key works down a ladder of the five newest stable Flash models (e.g. 3.8 → 3.7 → 3.6 → 3.5 → 2.5): the free tier allows only about **20 requests per model per day**, and brand-new models are often overloaded, so a spent or overloaded model rests (until Google's stated reset, or 15+ minutes when busy) and the next one answers, quietly. Only when every model on a key is resting does he move to the next key, and tell you so; he moves back up on his own as models recover. With no internet he uses the best tool-capable model from `ollama list`.
+- **Never runs dry** (but mind the free tier: about 20 requests per model per day, and a request that uses tools takes 2–4, so expect roughly 50–100 Sebas requests a day before the local model takes over): Gemini key 1 → Gemini key 2 → a local model. Each key works down a ladder of the five newest stable Flash models (e.g. 3.8 → 3.7 → 3.6 → 3.5 → 2.5): the free tier allows only about **20 requests per model per day**, and brand-new models are often overloaded, so a spent or overloaded model rests (until Google's stated reset, or 15+ minutes when busy) and the next one answers, quietly. When both keys' Flash models are spent, he moves to each key's **Flash-Lite** models (three per key, with far higher free limits), and only then to the local model. Switching keys is silent; dropping a tier earns one short sentence (*"Today's Gemini quota is spent, sir, so I am using a lighter model."*). He moves back up on his own as models recover. A 429 is judged daily or per-minute by Google's own `retryDelay`. With no internet he uses the best tool-capable model from `ollama list`.
 - **Modes**: voice, text (`--text`) and microphone calibration (`--mic-test`).
 
 ---
@@ -120,7 +128,12 @@ sebas/
 └── sebas_main/                      # OpenJarvis framework + Sebas
     ├── run_sebas.py                 # Entry point: interface, voice and text modes
     ├── ui_app.py                    # Desktop window (pywebview) and its bridge
-    ├── sebas_brain.py               # Gemini key 1 → key 2 → local model
+    ├── sebas_brain.py               # Gemini Flash (key 1, 2) → Flash-Lite (key 1, 2) → local
+    ├── sebas_eggs.py                # Anime Easter eggs (matched locally)
+    ├── sebas_games.py               # "Sebas, let's play pong" (matched locally)
+    ├── sebas_tests/                 # Offline tests: run.bat --selftest
+    ├── custom_tools/study.py        # Pomodoro, flashcards, quizzes, exams
+    ├── custom_tools/wellbeing.py    # Break, water and 20-20-20 eye nudges
     ├── sebas_events.py              # Live events from Sebas to the interface
     ├── sebas_scheduler.py           # Briefings, check-ins, alerts, system guardian
     ├── sebas_discord.py             # The private Discord bot
@@ -128,7 +141,7 @@ sebas/
     ├── requirements_voice.txt       # Voice pipeline packages
     ├── requirements_tools.txt       # Tool packages (boto3, pycaw)
     ├── requirements_ui.txt          # Interface package (pywebview)
-    ├── ui/                          # index.html, style.css, app.js, fonts/
+    ├── ui/                          # index.html, style.css, app.js, games.js, fonts/
     ├── .env.template                # Secrets and settings template
     ├── configs/sebas/
     │   ├── config.toml              # Model, persona, enabled tools
@@ -248,6 +261,10 @@ Sebas is on Discord only while he is running on the laptop (started with `run.ba
    > *"Sebas, remind me in twenty minutes to stretch."*
    >
    > *"Sebas, remember that my main project is the portfolio site."*
+   >
+   > *"Sebas, let's play pong."*
+   >
+   > *"Sebas, start a pomodoro on DBMS."* … *"Sebas, quiz me on DBMS."*
 
    Or type in the Service Bell, click a quick action, or ring the bell and just speak.
 
@@ -259,8 +276,11 @@ Sebas is on Discord only while he is running on the laptop (started with `run.ba
    | `run.bat --console` | Voice only, in the console (no interface) |
    | `run.bat --text` | Typing in the console (quiet rooms, testing) |
    | `run.bat --mic-test` | Microphone calibration |
+   | `run.bat --selftest` | Sebas's offline tests (no keys, no microphone, no quota) |
 
 4. **API check** (one request, for troubleshooting): `.venv\Scripts\python.exe sebas_bootstrap.py`
+
+5. **When something goes wrong**: warnings and Sebas's own activity are kept in `~/.openjarvis/sebas/logs/sebas.log` (three rotating files of 1 MB), so you can look after the window has closed. `run.bat --selftest` runs 28 offline tests in about 5 seconds: name and sleep parsing, Easter eggs and games, study mode (spaced repetition, reading Gemini's study material, exams, a full Pomodoro cycle, and alerts held during focus), wellbeing nudges on a simulated two-hour day (breaks, water, eye cues, stepping away, quiet while busy or paused), how Gemini errors are classified, the whole Flash → Flash-Lite → local chain against stub models (including that spent quotas are stored by key hash, never the key), Discord message splitting, and safety checks (no big system commands in the allowlist, `.env` ignored by git).
 
 ---
 

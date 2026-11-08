@@ -22,7 +22,7 @@ from openjarvis.speech.voice_io import play_wav
 
 from sebas_events import emit
 
-logger = logging.getLogger(__name__)
+logger = logging.getLogger("sebas.voice")
 
 _CHIME_RATE = 24000
 _MODEL_DIR = Path(os.environ.get("SEBAS_TTS_DIR") or Path.home() / ".cache" / "sebas" / "kokoro")
@@ -118,6 +118,16 @@ class Mouth:
         """Speak ``text``, starting as soon as its first sentence is ready."""
         with self._speaking:
             self._speak(text)
+
+    def speak_if_free(self, text: str) -> bool:
+        """Speak unless Sebas is already talking (game banter must never queue up)."""
+        if not self._speaking.acquire(blocking=False):
+            return False
+        try:
+            self._speak(text)
+        finally:
+            self._speaking.release()
+        return True
 
     def _speak(self, text: str) -> None:
         sentences = split_sentences(clean_for_speech(text))

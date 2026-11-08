@@ -6,6 +6,11 @@
 - Deadline alerts for agenda items due within the hour.
 - Calendar heads-up ten minutes before each Google Calendar event.
 - System guardian: low battery, memory nearly exhausted, disk nearly full.
+- Exam countdown: a word a week, three days and one day before each exam, and on the day.
+- Wellbeing: break and posture nudges, water reminders, and 20-20-20 eye cues
+  (custom_tools/wellbeing.py); spoken at the laptop only, never sent to Discord.
+- Quiet butler: during a Pomodoro focus block, non-urgent alerts and the
+  briefings wait; they are delivered together at the break.
 
 Briefings and check-ins only start while you are actually at the laptop (input
 in the last two minutes), and each happens at most once a day. SEBAS_PROACTIVE=off
@@ -26,6 +31,8 @@ from typing import Callable
 import psutil
 from openjarvis.core.paths import get_data_dir
 
+from sebas_events import emit
+
 logger = logging.getLogger("sebas.scheduler")
 
 _TICK_SECONDS = 30
@@ -33,6 +40,12 @@ _PRESENT_IDLE_SECONDS = 120
 _CALENDAR_POLL_SECONDS = 300
 _HEADS_UP_MINUTES = 10
 _ANIME_POLL_SECONDS = 30 * 60
+_EXAM_WARNINGS = {
+    7: "Sir, your {s} exam is a week away. A pomodoro or two each day would serve you well.",
+    3: "Sir, three days until your {s} exam. Shall we review the flashcards?",
+    1: "Sir, your {s} exam is tomorrow. A light review, and an early night, I would suggest.",
+    0: "Good luck in your {s} exam today, sir. You have prepared; trust the training arc.",
+}
 
 BRIEFING_PROMPT = (
     "[Scheduled morning briefing] Good morning. Please give me my morning briefing: "
@@ -87,6 +100,11 @@ class Scheduler:
         self._last_calendar_poll = 0.0
         self._last_anime_poll = 0.0
         self._ram_high_ticks = 0
+        self._held: list[str] = []  # non-urgent alerts waiting for the end of a focus block
+        self._held_lock = threading.Lock()
+        from custom_tools import study
+
+        study._held_releaser[:] = [self.release_held]
 
     # --- state ---------------------------------------------------------------
     def _load(self) -> dict:
@@ -117,10 +135,24 @@ class Scheduler:
         return False
 
     # --- delivery -------------------------------------------------------------
-    def _say(self, text: str) -> None:
+    def _say(self, text: str, urgent: bool = False) -> None:
+        from custom_tools.study import focus_active
+
+        if not urgent and focus_active():
+            with self._held_lock:
+                if text not in self._held:
+                    self._held.append(text)
+            return
         sent = self._remote is not None and self._remote.alert(text)
         if not (sent and self._remote.user_away()):
             self._raw_say(text)
+
+    def release_held(self) -> None:
+        """At the break: everything that waited during focus, in one go."""
+        with self._held_lock:
+            held, self._held = self._held, []
+        if held:
+            self._say("While you were focusing, sir: " + " ".join(held), urgent=True)
 
     def _converse(self, prompt: str, expect_reply: bool, title: str = "Briefing") -> None:
         reply = self._converse_local(prompt, expect_reply)
@@ -140,7 +172,7 @@ class Scheduler:
     def _run(self) -> None:
         time.sleep(20)  # let Sebas finish starting up first
         while True:
-            for job in (self._deadlines, self._calendar, self._guardian, self._routines, self._anime):
+            for job in (self._deadlines, self._calendar, self._guardian, self._routines, self._anime, self._exams, self._wellbeing):
                 try:
                     job(datetime.now())
                 except Exception:
@@ -149,6 +181,10 @@ class Scheduler:
 
     # --- jobs ------------------------------------------------------------------
     def _routines(self, now: datetime) -> None:
+        from custom_tools.study import focus_active
+
+        if focus_active():  # the briefing keeps until the break
+            return
         today = now.date().isoformat()
         present = idle_seconds() <= _PRESENT_IDLE_SECONDS
         evening_due = now.time() >= _clock("SEBAS_EVENING_TIME", "21:30")
@@ -178,7 +214,7 @@ class Scheduler:
                     self._say(f"A gentle reminder, sir: {task['task']} is due today.")
             elif now <= when <= now + timedelta(hours=1) and not self._seen("deadline_alerts", task["id"]):
                 minutes = max(1, round((when - now).total_seconds() / 60))
-                self._say(f"Sir, {task['task']} is due in {minutes} minutes.")
+                self._say(f"Sir, {task['task']} is due in {minutes} minutes.", urgent=True)
 
     def _calendar(self, now: datetime) -> None:
         if time.monotonic() - self._last_calendar_poll < _CALENDAR_POLL_SECONDS:
@@ -190,7 +226,7 @@ class Scheduler:
         for event_id, start, title in events_between(local_now, local_now + timedelta(minutes=_HEADS_UP_MINUTES + 6)):
             minutes = round((start - local_now).total_seconds() / 60)
             if 0 <= minutes <= _HEADS_UP_MINUTES + 5 and not self._seen("calendar_alerts", f"{event_id}@{start.isoformat()}"):
-                self._say(f"Sir, {title} begins in {minutes} minutes." if minutes else f"Sir, {title} is beginning now.")
+                self._say(f"Sir, {title} begins in {minutes} minutes." if minutes else f"Sir, {title} is beginning now.", urgent=True)
 
     def _anime(self, now: datetime) -> None:
         """New episodes, chapters and volumes on the user's AniList, every 30 minutes."""
@@ -205,6 +241,25 @@ class Scheduler:
         if news:
             self._say("Sir, a little news from your watchlist: " + "; ".join(news[:4]) + ".")
 
+    def _wellbeing(self, now: datetime) -> None:
+        from custom_tools.wellbeing import WELLBEING
+
+        for nudge in WELLBEING.tick():
+            emit("wellbeing", nudge=nudge.kind, line=nudge.line)  # the card on the interface
+            if nudge.spoken:
+                self._raw_say(nudge.line)  # at the laptop only: no Discord, nothing held for later
+
+    def _exams(self, now: datetime) -> None:
+        """A word a week, three days and one day before each exam, and on the day."""
+        if now.hour < 8:
+            return
+        from custom_tools.study import days_until, upcoming_exams
+
+        for exam in upcoming_exams():
+            days = days_until(exam)
+            if days in _EXAM_WARNINGS and not self._seen("exam_alerts", f"{exam['id']}@{days}"):
+                self._say(_EXAM_WARNINGS[days].format(s=exam["subject"]))
+
     def _guardian(self, now: datetime) -> None:
         battery = psutil.sensors_battery()
         if battery is not None:
@@ -216,7 +271,8 @@ class Scheduler:
                         self._state["battery_warned"] = level
                         self._save()
                         self._say(f"Sir, the battery has fallen to {battery.percent:.0f} percent. "
-                                  + ("Please connect the charger soon." if level == 20 else "The laptop will shut down shortly without power."))
+                                  + ("Please connect the charger soon." if level == 20 else "The laptop will shut down shortly without power."),
+                                  urgent=True)
                         break
         ram = psutil.virtual_memory().percent
         self._ram_high_ticks = self._ram_high_ticks + 1 if ram >= 92 else 0

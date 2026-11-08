@@ -53,12 +53,12 @@ def known_folder(name: str) -> Path:
 
 # --------------------------------------------------------------------------- screen
 
-def gemini_once(contents: list, *, need: str, timeout_ms: int = 40_000) -> str:
+def gemini_once(contents: list, *, need: str, timeout_ms: int = 40_000, json_mode: bool = False) -> str:
     """One stand-alone Gemini request (outside the conversation), trying each key
     and model in turn like the brain does. ``need`` names the task for errors."""
     from google import genai
 
-    from sebas_brain import choose_gemini_models, classify_failure
+    from sebas_brain import choose_gemini_models, choose_lite_models, classify_failure
 
     keys = [k for k in (os.environ.get("GEMINI_API_KEY", ""), os.environ.get("GEMINI_API_KEY_2", "")) if k.strip()]
     if not keys:
@@ -66,9 +66,11 @@ def gemini_once(contents: list, *, need: str, timeout_ms: int = 40_000) -> str:
     last = None
     for key in keys:
         client = genai.Client(api_key=key, http_options={"timeout": timeout_ms})
-        for model in choose_gemini_models(key):
+        # Flash first, then Flash-Lite (far higher free limits) once Flash is spent
+        for model in choose_gemini_models(key) + choose_lite_models(key):
             try:
-                reply = client.models.generate_content(model=model, contents=contents)
+                config = {"response_mime_type": "application/json"} if json_mode else None
+                reply = client.models.generate_content(model=model, contents=contents, config=config)
                 return (reply.text or "").strip()
             except Exception as exc:  # quota, overload: try the next model, then the next key
                 if classify_failure(exc) is None:

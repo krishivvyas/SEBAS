@@ -6,10 +6,16 @@ rem   run.bat --no-voice   Desktop interface, typing only
 rem   run.bat --console    Voice mode in this console window, no interface
 rem   run.bat --text       Typing in this console window, no interface
 rem   run.bat --mic-test   Measure the microphone and suggest SEBAS_SILENCE_THRESHOLD
+rem   run.bat --selftest   Offline tests (no keys, microphone or quota needed)
+rem Log file: %USERPROFILE%\.openjarvis\sebas\logs\sebas.log
 rem Say "Sebas, sleep" (or type it) and he says goodbye and closes.
+rem Say "Sebas, let's play pong" (or press Games) for the built-in games: no AI, no quota.
+rem Study mode: "Sebas, start a pomodoro on DBMS", "make flashcards for DBMS", "quiz me on DBMS".
+rem Wellbeing: stretch, water and 20-20-20 eye nudges; "pause the reminders for an hour".
 rem If DISCORD_BOT_TOKEN is set, the Discord bot starts too (and stops when Sebas closes).
-rem Thinks with Gemini (GEMINI_API_KEY, then GEMINI_API_KEY_2 in sebas_main\.env);
-rem when both are out of quota, or offline, with a local model through Ollama.
+rem Thinks with Gemini (GEMINI_API_KEY, then GEMINI_API_KEY_2 in sebas_main\.env): Flash
+rem first, then the lighter Flash-Lite models; when those are spent too, or offline,
+rem with a local model through Ollama.
 
 set "REPO=%~dp0sebas_main"
 set "PYTHON=%REPO%\.venv\Scripts\python.exe"
