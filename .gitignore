@@ -46,6 +46,9 @@ htmlcov/
 results/
 logs/
 
+# Local installers (VB-Cable driver pack)
+/tools/
+
 # Operating System files
 .DS_Store
 Thumbs.db

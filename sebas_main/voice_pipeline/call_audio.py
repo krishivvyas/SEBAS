@@ -209,10 +209,12 @@ class CableRoute:
         self._stop = threading.Event()
         self._thread: threading.Thread | None = None
         self.playing = threading.Event()
+        self.ready = threading.Event()  # set once audio is flowing into the cable (opening takes 3-5 s cold)
         self.error: str = ""
 
     def start(self) -> None:
         self._stop.clear()
+        self.ready.clear()
         self._thread = threading.Thread(target=self._run, name="sebas-call-cable", daemon=True)
         self._thread.start()
 
@@ -235,11 +237,14 @@ class CableRoute:
 
         warnings.filterwarnings("ignore", category=sc.SoundcardRuntimeWarning)
         ctypes.windll.ole32.CoInitializeEx(None, 0)
+        from scipy.signal import resample_poly  # noqa: F401  2.5 s cold: load it now, not on the greeting
+
         mic = real_microphone()
         try:
             with self.cable.player(samplerate=_LOOP_RATE, channels=1, blocksize=_BUFFER) as player:
                 if mic is None:  # no microphone: Sebas's voice alone
                     logger.warning("Call: no microphone to pass through; only Sebas will be heard")
+                    self.ready.set()
                     while not self._stop.is_set():
                         block = np.zeros(_BLOCK, dtype=np.float32)
                         voice = self._next_voice(_BLOCK)
@@ -248,6 +253,7 @@ class CableRoute:
                     return
                 with mic.recorder(samplerate=_LOOP_RATE, channels=1, blocksize=_BUFFER) as recorder:
                     logger.info("Call: clean mode, %s and Sebas into %s", mic.name, self.name)
+                    self.ready.set()
                     while not self._stop.is_set():
                         block = recorder.record(numframes=_BLOCK)[:, 0].astype(np.float32)
                         if lagging(player) and not self.playing.is_set():
@@ -291,7 +297,8 @@ def check_cable(route: CableRoute) -> tuple[bool, str]:
     out = next((m for m in sc.all_microphones() if "cable output" in m.name.lower()), None)
     if out is None:
         return False, "VB-Cable's 'CABLE Output' microphone was not found."
-    if not route.alive():
+    route.ready.wait(timeout=10)  # a route started a moment ago is still opening the microphone
+    if not route.alive() or not route.ready.is_set():
         return False, f"The cable route is not running ({route.error or 'stopped'})."
     t = np.arange(int(0.6 * _LOOP_RATE)) / _LOOP_RATE
     tone = (0.3 * np.sin(2 * np.pi * 660 * t)).astype(np.float32)
