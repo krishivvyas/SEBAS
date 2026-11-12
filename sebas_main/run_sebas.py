@@ -119,9 +119,22 @@ def run_voice_turn(listener, ears, mouth, brain, follow_up_seconds: float = 0.0)
         accurate = split_address(ears.transcribe(pcm))
         text = request_text(accurate if accurate else remainder)
 
+    import sebas_calls
+
     while text:
         print(f"You:   {text}", flush=True)
         emit("transcript", role="user", text=text)
+        def ask(question: str) -> str:  # "Krishiv or Hermit, sir?"
+            emit("transcript", role="sebas", text=question)
+            mouth.speak(question)
+            mouth.chime()
+            emit("state", state="listening")
+            answer = ears.listen(wait_seconds=5)
+            emit("transcript", role="user", text=answer or "(no answer)")
+            return answer
+
+        if sebas_calls.handle(text, ask):  # call commands; during a call, nothing else
+            break
         if is_sleep_request(text):
             say_farewell(mouth)
             raise SebasSleep
@@ -146,17 +159,30 @@ def run_voice_turn(listener, ears, mouth, brain, follow_up_seconds: float = 0.0)
     emit("state", state="idle")
 
 
-def start_discord(brain):
-    """Start the Discord bridge if it is configured in .env; returns it or None."""
+def start_discord(brain, ears=None, mouth=None):
+    """Start the Discord bridge if it is configured in .env; returns it or None.
+    ``ears`` and ``mouth`` are shared with it for voice notes and the voice channel."""
     from sebas_discord import DiscordBridge, discord_configured
     from voice_pipeline.name_listener import is_sleep_request
 
     if not discord_configured():
         return None
     bridge = DiscordBridge(brain, is_sleep_request)
+    bridge.attach_voice(ears, mouth)
     bridge.start()
     print("Discord: connecting...", flush=True)
     return bridge
+
+
+def start_calls(ears=None, mouth=None) -> None:
+    """Sebas on calls: shares the speech models, finds VB-Cable, and starts Ctrl+Alt+C."""
+    import sebas_calls
+
+    try:
+        sebas_calls.DESK.attach(ears, mouth)
+        sebas_calls.start_hotkey()
+    except Exception:
+        logger.exception("Call support unavailable")
 
 
 def load_voice():
@@ -205,7 +231,8 @@ def run_voice(brain) -> None:
 
     from sebas_scheduler import Scheduler
 
-    Scheduler(announce, converse, start_discord(brain)).start()
+    Scheduler(announce, converse, start_discord(brain, ears, mouth)).start()
+    start_calls(ears, mouth)
     print('Ready. Say "Sebas, rise", or "Sebas" followed by a request. "Sebas, sleep" to finish.', flush=True)
     try:
         while True:
@@ -230,6 +257,7 @@ def run_text(brain) -> None:
         return reply
 
     Scheduler(announce, converse, start_discord(brain)).start()
+    start_calls()
     while True:
         text = input("You:   ").strip()
         if not text:

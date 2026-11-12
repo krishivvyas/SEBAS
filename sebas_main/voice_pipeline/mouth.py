@@ -101,18 +101,32 @@ class Mouth:
         self._lang = "en-gb" if voice.startswith("b") else "en-us"
         # Reminders speak from a timer thread; one voice at a time.
         self._speaking = threading.Lock()
+        # The laptop and Discord share one Kokoro: one synthesis at a time.
+        self._synth_lock = threading.Lock()
 
     def load(self) -> None:
         """Load the model now, so the first reply is not delayed by it."""
         self._synthesize("Ready.")
 
+    def _create(self, sentence: str) -> tuple[np.ndarray, int]:
+        with self._synth_lock:
+            if self._kokoro is None:
+                self._kokoro = _load_kokoro()
+            return self._kokoro.create(sentence, voice=self._voice, speed=1.0, lang=self._lang)
+
     def _synthesize(self, sentence: str) -> bytes:
-        if self._kokoro is None:
-            self._kokoro = _load_kokoro()
-        audio, rate = self._kokoro.create(sentence, voice=self._voice, speed=1.0, lang=self._lang)
+        audio, rate = self._create(sentence)
         buffer = io.BytesIO()
         sf.write(buffer, audio, rate, format="WAV")
         return buffer.getvalue()
+
+    def render(self, text: str) -> tuple[np.ndarray, int]:
+        """The whole of ``text`` as audio, without playing it (for Discord)."""
+        clips, rate = [], 24000
+        for sentence in split_sentences(clean_for_speech(text)):
+            audio, rate = self._create(sentence)
+            clips += [np.asarray(audio, dtype=np.float32), np.zeros(int(rate * 0.12), dtype=np.float32)]
+        return (np.concatenate(clips) if clips else np.zeros(0, dtype=np.float32)), rate
 
     def speak(self, text: str) -> None:
         """Speak ``text``, starting as soon as its first sentence is ready."""

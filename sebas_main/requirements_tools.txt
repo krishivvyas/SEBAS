@@ -2,6 +2,6 @@
 #   uv pip install -r requirements_tools.txt
 boto3>=1.34      # devops_manager: AWS EC2 health
 pycaw>=20240210  # laptop: volume control (Windows)
-discord.py==2.7.1   # sebas_discord: the private Discord bot
+discord.py[voice]==2.7.1   # sebas_discord: the private Discord bot; [voice] adds PyNaCl + davey for the voice channel
 pillow>=10          # assist: screenshots for the screen reader
 pypdf>=4            # notes: reading PDFs aloud

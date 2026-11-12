@@ -101,6 +101,16 @@
       <div class="nudge-actions"><button id="nudge-water" class="game-btn">Drank a glass</button><button id="nudge-ok" class="game-btn">Very well</button></div>
     </div>
 
+    <!-- On a call: captions, Sebas speaking for you, a message passed on silently -->
+    <div id="call" aria-live="polite" data-state="off">
+      <div class="call-head"><span class="call-dot"></span><b id="call-title">Calls</b><span id="call-route">speaker</span><button id="call-close" class="call-x" title="Hide">×</button></div>
+      <ol id="call-lines"></ol>
+      <form id="call-relay"><input id="call-relay-text" placeholder="Tell them… (they won't hear you type)" maxlength="300" autocomplete="off"><button class="game-btn">Pass on</button></form>
+      <div class="call-actions"><span id="call-as" hidden></span><button id="call-take" class="game-btn">Take the call</button><button id="call-captions" class="game-btn">Captions</button></div>
+      <p class="call-warn" id="call-warn" hidden>Speaker mode: callers may not hear me (call apps filter out laptop sound). <button id="call-test" class="call-link">Set up clean mode</button></p>
+      <p class="call-hint">Answer the call yourself first · Ctrl+Alt+C takes it or hands it back</p>
+    </div>
+
     <!-- Pomodoro: shown only during a study session -->
     <div id="pomo" aria-live="polite">
       <svg viewBox="0 0 60 60"><circle cx="30" cy="30" r="26" class="track"/><circle id="pomo-ring" cx="30" cy="30" r="26" class="bar"/></svg>
@@ -367,6 +377,7 @@
     <button data-ask="Anything new on GitHub?">GitHub</button>
     <button data-ask="How is my laptop doing?">System Status</button>
     <button data-game>Games</button>
+    <button data-call>Calls</button>
   </div>
   <form class="bellbar" id="bell-form" autocomplete="off">
     <button type="button" id="bell" title="Ring the bell to speak">
@@ -383,5 +394,6 @@
 <script src="games.js"></script>
 <script src="study.js"></script>
 <script src="wellbeing.js"></script>
+  <script src="calls.js"></script>
 </body>
 </html>

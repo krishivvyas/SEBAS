@@ -9,6 +9,11 @@ only to you and the bot, with five channels:
     #ledger     what changed: tasks, expenses, journal, memory
     #status     one message he keeps updated: battery, mind, agenda, spending
 
+and a private voice channel, "Sebas Voice". Voice notes sent in #sebas are
+transcribed on the laptop and answered with text and a voice note; while the
+master is in "Sebas Voice" he joins and speaks replies and alerts there
+(sebas_discord_voice.py).
+
 Laptop actions asked for from Discord (opening apps, locking, music, Wi-Fi...)
 never run straight away: Sebas asks, and only your "yes" carries them out.
 
@@ -21,6 +26,7 @@ loop or the interface.
 from __future__ import annotations
 
 import asyncio
+import io
 import json
 import logging
 import os
@@ -54,6 +60,7 @@ HELP = (
     "**At your service, sir.** Write to me here as you would speak to me.\n"
     "- Ask anything: *how are my deployments?*, *what's on my agenda?*, *I spent 300 on books*\n"
     "- Laptop actions (opening apps, music, locking, Wi-Fi...) wait for your **yes** before I act.\n"
+    "- Send a **voice note** and I answer with one; join **Sebas Voice** and I speak my replies there.\n"
     "- `!status` for a quick summary, `!help` for this note.\n"
     "Alerts arrive in #alerts, briefings in #briefings, changes in #ledger, and #status stays current."
 )
@@ -70,7 +77,12 @@ Anything that acts on the laptop waits for your **yes** before I do it. This cha
 """## Quick commands
 `!status` · battery, which mind I'm using, today's agenda and spending
 `!help` · a short reminder of how to use me
-`yes` / `no` · confirm or cancel a laptop action I've asked about (lapses after 5 minutes)""",
+`yes` / `no` · confirm or cancel a laptop action I've asked about (lapses after 5 minutes)
+`!join` / `!leave` · I join the voice channel you're in, or leave it""",
+
+"""## Voice
+**Voice notes:** hold the mic in **#sebas** and speak as you would at the laptop. I transcribe it on the laptop (it is never saved or sent anywhere else), show what I heard, and answer in writing and with a voice note of my own. A spoken *yes* confirms a laptop action just as a typed one does. Notes up to 3 minutes.
+**Sebas Voice:** join that voice channel and I join you, speaking my replies and #alerts aloud; leave and I follow. Talk to me there by text or voice note in #sebas: I cannot listen in a call, since Discord encrypts every call end to end.""",
 
 """## Agenda & to-dos
 *Add submit the DBMS assignment by Friday at 5 pm* · adds a task with a deadline
@@ -141,6 +153,10 @@ While you focus I hold non-urgent alerts and briefings until the break (deadline
 I keep an eye on you while you work: a nudge to stretch after about an hour without a break, a glass of water every 90 minutes, and a quiet on-screen 20-20-20 cue for your eyes every 20 minutes. Never while you're away, focusing, gaming or watching something full screen.
 *I drank water* · *how long have I been working?* · *pause the reminders for an hour* · *stop the eye reminders* · *remind me to stretch every 45 minutes*""",
 
+"""## Your calls (at the laptop)
+Answer a WhatsApp, Instagram, Meet or phone call on the laptop, then say *Sebas, take this call* and I ask: *Krishiv or Hermit, sir?* (or say *take this call as Hermit*, press **Ctrl+Alt+C**, or use **Calls** on the interface). Then I speak to the caller as your assistant: your message, a message from them, simple questions about when you're free. *Tell them I'll call back at 6* passes one message on; *captions on* shows what they say while you talk; *step back* returns the call to you. For callers to hear me, install VB-Cable once and pick *CABLE Output* as the call's microphone; *test call audio* checks it.
+I never pretend to be you, agree to nothing on your behalf, and share nothing private. Nothing is recorded; a short summary of each call I handle arrives in #alerts.""",
+
 """## The Games Room (at the laptop)
 *Sebas, let's play tic-tac-toe* · *pong* · *rock paper scissors* · *play a memory game* · *play anime trivia* · *connect four* · *hangman* · *play snake* · *I'm bored*
 Or press **Games** on the interface. The games are built in and need no AI or quota; my commentary is my own, with the odd anime reference.
@@ -158,10 +174,18 @@ At the laptop the interface reacts as well; here you have my word for it. The in
 **#ledger** · every task, expense, journal entry and memory I record
 **#status** · a live summary, refreshed every 5 minutes
 **#commands** · this guide
+**Sebas Voice** · join and I speak my replies and alerts there
 
 ## Not from Discord
-Sending me to sleep (*Sebas, sleep*), the games and voice commands work only at the laptop.""",
+Sending me to sleep (*Sebas, sleep*), the games, the wake word and taking your calls work only at the laptop.""",
 ]
+
+VOICE_CHANNEL = "Sebas Voice"
+PERMISSION_NOTE = (
+    "*For my voice, sir, I need three more permissions: **Attach Files** (voice notes), **Connect** and "
+    "**Speak** (the voice channel). Server Settings → Roles → Sebas, switch them on, and restart me.*"
+)
+VC_GREETING ="At your service, sir. Speak to me in writing or by voice note in the sebas channel, and I shall answer here."
 
 _STATUS_SECONDS = 300
 _CONFIRM_SECONDS = 300
@@ -184,6 +208,14 @@ def _split(text: str, limit: int = 1900) -> list[str]:
         cut = cut if cut > limit // 2 else limit
         parts.append(text[:cut]); text = text[cut:].lstrip()
     return parts + ([text] if text else [])
+
+
+def _voice_note(message):
+    """The message's voice note (or other audio attachment), if it has one."""
+    for attachment in message.attachments:
+        if attachment.is_voice_message() or (attachment.content_type or "").startswith("audio/"):
+            return attachment
+    return None
 
 
 def status_text(brain) -> str:
@@ -218,6 +250,16 @@ class DiscordBridge:
         self.owner_id: int | None = _configured_owner()  # else the server owner, once connected
         self._pending: dict[str, Any] | None = None  # action awaiting the master's yes
         self._state_path = get_data_dir() / "sebas" / "discord.json"
+        from sebas_discord_voice import VoiceKit
+
+        self.voice = VoiceKit()       # Whisper and Kokoro for voice notes and the voice channel
+        self.voice_channel = None     # "Sebas Voice": he joins when the master does
+        self._vc = None               # the live voice connection, if any
+        self._play_lock: asyncio.Lock | None = None
+
+    def attach_voice(self, ears=None, mouth=None) -> None:
+        """Share the laptop's speech models, so they are not loaded twice."""
+        self.voice.attach(ears, mouth)
 
     # --- lifecycle -----------------------------------------------------------
     def start(self) -> None:
@@ -257,6 +299,10 @@ class DiscordBridge:
         @client.event
         async def on_message(message) -> None:
             await self._on_message(message)
+
+        @client.event
+        async def on_voice_state_update(member, before, after) -> None:
+            await self._follow_master(member, before, after)
 
         try:
             self.loop.run_until_complete(client.start(os.environ["DISCORD_BOT_TOKEN"].strip()))
@@ -307,6 +353,7 @@ class DiscordBridge:
                 channel = await guild.create_text_channel(name, category=category, topic=topic, overwrites=access,
                                                           reason="Sebas setting up his quarters")
             self.channels[name] = channel
+        await self._prepare_voice_channel(guild, category, state)
         if not state.get("help_pinned"):
             note = await self.channels["sebas"].send(HELP)
             try:
@@ -316,7 +363,103 @@ class DiscordBridge:
             state["help_pinned"] = note.id
         await self._publish_guide(state)
         state.update({"guild": guild.id, "category": category.id, **{k: c.id for k, c in self.channels.items()}})
+        if self.voice_channel is not None:
+            state["voice"] = self.voice_channel.id
         self._save_state(state)
+
+    async def _prepare_voice_channel(self, guild, category, state: dict) -> None:
+        """A private voice channel, "Sebas Voice": only the master and the bot."""
+        import discord
+
+        channel = guild.get_channel(state.get("voice", 0)) or discord.utils.get(category.voice_channels, name=VOICE_CHANNEL)
+        if channel is None:
+            try:
+                channel = await guild.create_voice_channel(VOICE_CHANNEL, category=category, overwrites={
+                    guild.default_role: discord.PermissionOverwrite(view_channel=False),
+                    guild.me: discord.PermissionOverwrite(view_channel=True, connect=True, speak=True),
+                    discord.Object(id=self.owner_id, type=discord.Member): discord.PermissionOverwrite(
+                        view_channel=True, connect=True, speak=True),
+                }, reason="Sebas setting up his quarters")
+            except discord.HTTPException as exc:
+                # The bot was invited without Connect/Speak/Manage Channels: text still works.
+                logger.warning("Could not create the voice channel (%s); voice notes still work", exc)
+                await self.channels["sebas"].send(PERMISSION_NOTE)
+                return
+        self.voice_channel = channel
+
+    # --- the voice channel -----------------------------------------------------
+    async def _follow_master(self, member, before, after) -> None:
+        """Join "Sebas Voice" when the master does; leave when the master leaves it."""
+        if member.id != self.owner_id or self.voice_channel is None:
+            return
+        if after.channel is not None and after.channel.id == self.voice_channel.id:
+            await self._join(after.channel)
+        elif self._vc is not None and (after.channel is None or after.channel.id != self._vc.channel.id):
+            await self._leave()
+
+    async def _join(self, channel) -> str:
+        import discord
+
+        if self._vc is not None and self._vc.is_connected():
+            if self._vc.channel.id == channel.id:
+                return "I am already with you, sir."
+            await self._vc.move_to(channel)
+        else:
+            try:
+                self._vc = await channel.connect(self_deaf=True)  # he cannot listen there: say so honestly
+            except (discord.ClientException, discord.HTTPException, RuntimeError, asyncio.TimeoutError) as exc:
+                logger.warning("Could not join %s: %s", channel.name, exc)
+                return f"I could not join {channel.name}, sir ({type(exc).__name__})."
+        logger.info("Joined voice channel %s", channel.name)
+        self.loop.create_task(self._speak_in_channel(VC_GREETING))
+        return f"Joined {channel.name}, sir."
+
+    async def _leave(self) -> str:
+        vc, self._vc = self._vc, None
+        if vc is None or not vc.is_connected():
+            return "I am not in a voice channel, sir."
+        await vc.disconnect()
+        logger.info("Left the voice channel")
+        return "I have left the voice channel, sir."
+
+    def in_voice_channel(self) -> bool:
+        return self._vc is not None and self._vc.is_connected()
+
+    async def _speak_in_channel(self, text: str) -> None:
+        """Say ``text`` in the voice channel; one utterance at a time, in order."""
+        import discord
+
+        from sebas_discord_voice import discord_pcm
+
+        if not self.in_voice_channel():
+            return
+        try:
+            audio, rate = await self._in_thread(self.voice.render, text)
+        except Exception:
+            logger.exception("Could not voice a reply for the voice channel")
+            return
+        if self._play_lock is None:
+            self._play_lock = asyncio.Lock()
+        async with self._play_lock:
+            vc = self._vc
+            if vc is None or not vc.is_connected() or audio.size == 0:
+                return
+            done = self.loop.create_future()
+
+            def finished(error) -> None:
+                self.loop.call_soon_threadsafe(lambda: done.done() or done.set_result(error))
+
+            vc.play(discord.PCMAudio(io.BytesIO(discord_pcm(audio, rate))), after=finished)
+            error = await done
+            if error:
+                logger.warning("Voice playback failed: %s", error)
+
+    def say_in_voice(self, text: str) -> bool:
+        """From any thread: speak in the voice channel if Sebas is in one."""
+        if not self.ready.is_set() or not self.in_voice_channel():
+            return False
+        asyncio.run_coroutine_threadsafe(self._speak_in_channel(text), self.loop)
+        return True
 
     async def _publish_guide(self, state: dict) -> None:
         """Post the #commands guide; replace it whenever its text changes."""
@@ -353,38 +496,108 @@ class DiscordBridge:
         if self.channels.get("sebas") is None or message.channel.id != self.channels["sebas"].id:
             return
         text = message.content.strip()
+        note = _voice_note(message)
+        spoken = False
+        if not text and note is not None:
+            text = await self._hear(message, note)
+            spoken = True
         if not text:
             return
-        low = text.lower().rstrip(".!")
+        reply = await self._reply_to(message, text)
+        if reply is None:  # already answered (a confirmation)
+            return
+        for i, part in enumerate(_split(reply or "…")):
+            await (message.reply(part, mention_author=False) if i == 0 else message.channel.send(part))
+        if self.in_voice_channel():
+            await self._speak_in_channel(reply)
+        elif spoken:  # a voice note is answered with one
+            await self._send_voice_note(message, reply)
+
+    async def _reply_to(self, message, text: str) -> str | None:
+        low = text.lower().strip().rstrip(".!")
         if low in ("!help", "help"):
-            await message.reply(HELP, mention_author=False)
-            return
+            return HELP
         if low == "!status":
-            await message.reply(await self._in_thread(status_text, self.brain), mention_author=False)
-            return
+            return await self._in_thread(status_text, self.brain)
+        if low in ("!join", "join voice", "join me", "join the voice channel", "join the call"):
+            return await self._join_master()
+        if low in ("!leave", "leave voice", "leave the voice channel", "leave the call"):
+            return await self._leave()
         if self._pending and low in ("yes", "y", "yes please", "confirm", "do it", "go ahead", "no", "n", "cancel", "never mind"):
             await self._answer_confirmation(message, low)
-            return
+            return None
         if self._is_sleep(text):
-            await message.reply(SLEEP_REFUSAL, mention_author=False)
-            return
+            return SLEEP_REFUSAL
+        import sebas_calls
+
+        if sebas_calls.check(text) is not None:
+            return ("*Calls are taken at the laptop, sir: answer it there, then say \"Sebas, take this call\" "
+                    "or press Ctrl+Alt+C. I shall post a summary in #alerts afterwards.*")
         import sebas_eggs
 
         egg = sebas_eggs.check(text)
         if egg is not None:  # the line only; the visual effect shows on the laptop's interface
             sebas_eggs.trigger(egg)
-            await message.reply(f"*{egg.line}*", mention_author=False)
-            return
+            return f"*{egg.line}*"
         import sebas_games
 
         if sebas_games.check(text) is not None:  # no quota spent on "let's play pong"
-            await message.reply("*The Games Room is at the laptop, sir. Say \"Sebas, let's play\" "
-                                "or press Games on the interface, and I shall be ready.*", mention_author=False)
-            return
+            return ("*The Games Room is at the laptop, sir. Say \"Sebas, let's play\" "
+                    "or press Games on the interface, and I shall be ready.*")
         async with message.channel.typing():
-            reply = await self._in_thread(self._ask_remote, text)
-        for i, part in enumerate(_split(reply or "…")):
-            await (message.reply(part, mention_author=False) if i == 0 else message.channel.send(part))
+            return await self._in_thread(self._ask_remote, text)
+
+    async def _hear(self, message, note) -> str:
+        """Transcribe a voice note on the laptop; show what was heard."""
+        from sebas_discord_voice import MAX_NOTE_BYTES, MAX_NOTE_SECONDS, NoteTooLong
+
+        if note.size > MAX_NOTE_BYTES:
+            await message.reply(f"That note is rather long for me, sir; under {MAX_NOTE_SECONDS // 60} minutes, if you would.",
+                                mention_author=False)
+            return ""
+        try:
+            async with message.channel.typing():
+                heard = await self._in_thread(self.voice.transcribe, await note.read())
+        except NoteTooLong:
+            await message.reply(f"That note is rather long for me, sir; under {MAX_NOTE_SECONDS // 60} minutes, if you would.",
+                                mention_author=False)
+            return ""
+        except Exception:
+            logger.exception("Could not transcribe a voice note")
+            await message.reply("I could not make out that note, sir; the details are in the laptop's log.",
+                                mention_author=False)
+            return ""
+        if not heard:
+            await message.reply("I heard no words in that note, sir.", mention_author=False)
+            return ""
+        logger.info("Voice note heard (%.0f s)", note.duration or 0)  # what was said is not logged
+        await message.reply(f"🎙️ *{heard}*", mention_author=False)
+        return heard
+
+    async def _send_voice_note(self, message, reply: str) -> None:
+        import discord
+
+        from sebas_discord_voice import voice_note
+
+        try:
+            audio, rate = await self._in_thread(self.voice.render, reply)
+            if audio.size == 0:
+                return
+            data = await self._in_thread(voice_note, audio, rate)
+            await message.channel.send(file=discord.File(io.BytesIO(data), filename="sebas.ogg"))
+        except discord.Forbidden:
+            await message.channel.send(PERMISSION_NOTE)
+        except Exception:
+            logger.exception("Could not send a voice note")
+
+    async def _join_master(self) -> str:
+        """!join: the voice channel the master is in, else "Sebas Voice" to wait there."""
+        guild = self.channels["sebas"].guild
+        member = guild.get_member(self.owner_id)
+        where = member.voice.channel if member is not None and member.voice and member.voice.channel else self.voice_channel
+        if where is None:
+            return "There is no voice channel I may join, sir. Join one first, and ask me again."
+        return await self._join(where)
 
     def _ask_remote(self, text: str) -> str:
         """Ask the brain with the laptop-action gate closed."""
@@ -446,6 +659,7 @@ class DiscordBridge:
         self.send("sebas", reply)  # so the answer can be given right here
 
     def alert(self, text: str) -> bool:
+        self.say_in_voice(text)
         return self.send("alerts", text)
 
     def briefing(self, title: str, text: str) -> bool:
@@ -457,6 +671,9 @@ class DiscordBridge:
 
     # --- the ledger and the live status --------------------------------------
     def _on_event(self, kind: str, data: dict[str, Any]) -> None:
+        if kind == "call_summary" and data.get("text"):
+            self.send("alerts", f"**Call** · {datetime.now().strftime('%I:%M %p')}\n{data['text']}")
+            return
         if kind == "tool" and data.get("phase") == "end" and data.get("success") and data.get("tool") in LEDGER_TOOLS:
             result = (data.get("result") or "").strip()
             if result and "confirmation" not in result:

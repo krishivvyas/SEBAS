@@ -341,6 +341,7 @@ function applySnapshot(s) {
   if (v.memory != null) setDial("memory", v.memory, `${Math.round(v.memory)}%`);
   if (s.study && typeof Study !== "undefined") Study.apply(s.study);
   if (s.wellbeing && typeof Wellbeing !== "undefined") Wellbeing.apply(s.wellbeing);
+  if (s.call && typeof Calls !== "undefined") Calls.apply(s.call);
 }
 
 /* ---------------- Events from Python ---------------- */
@@ -364,6 +365,13 @@ window.Sebas = {
       case "egg": Eggs.play(evt.name); break;
       case "game": if (typeof Games !== "undefined") Games.show(evt.name); break;  // a top-level const is not on window
       case "wellbeing": if (typeof Wellbeing !== "undefined") Wellbeing.nudge(evt.nudge, evt.line); break;
+      case "call": if (typeof Calls !== "undefined") Calls.setState(evt); break;
+      case "call_line": if (typeof Calls !== "undefined") Calls.line(evt.who, evt.text); break;
+      case "call_ask": if (typeof Calls !== "undefined") Calls.askName(evt.names); break;
+      case "call_summary":
+        addEntry("notice", `Call summary: ${evt.text}`);
+        if (typeof Calls !== "undefined") Calls.summary(evt.text);
+        break;
       case "study":
         if (typeof Study === "undefined") break;
         if (evt.view === "pomodoro") Study.setSession(evt.session);

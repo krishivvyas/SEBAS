@@ -145,7 +145,9 @@ class Scheduler:
             return
         sent = self._remote is not None and self._remote.alert(text)
         if not (sent and self._remote.user_away()):
-            self._raw_say(text)
+            import sebas_calls  # mid-call it would be spoken into the call: it waits
+
+            sebas_calls.DESK.hold_or_say(self._raw_say, text)
 
     def release_held(self) -> None:
         """At the break: everything that waited during focus, in one go."""
@@ -183,7 +185,9 @@ class Scheduler:
     def _routines(self, now: datetime) -> None:
         from custom_tools.study import focus_active
 
-        if focus_active():  # the briefing keeps until the break
+        import sebas_calls
+
+        if focus_active() or sebas_calls.DESK.active():  # the briefing keeps until the break
             return
         today = now.date().isoformat()
         present = idle_seconds() <= _PRESENT_IDLE_SECONDS

@@ -9,3 +9,4 @@ kokoro-onnx>=0.6
 sounddevice>=0.5
 soundfile>=0.12
 numpy>=1.24
+soundcard>=0.4.6   # calls: hearing the caller from the laptop's sound output (WASAPI loopback)

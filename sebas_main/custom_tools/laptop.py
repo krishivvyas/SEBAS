@@ -328,7 +328,9 @@ def set_announcer(announce: Callable[[str], None]) -> None:
 def _fire(reminder_id: int, message: str) -> None:
     with _reminders_lock:
         _reminders.pop(reminder_id, None)
-    _announce(f"Pardon the interruption. A reminder: {message}")
+    import sebas_calls  # mid-call, a spoken reminder would go into the call: it waits
+
+    sebas_calls.DESK.hold_or_say(_announce, f"Pardon the interruption. A reminder: {message}")
 
 
 @ToolRegistry.register("set_reminder")

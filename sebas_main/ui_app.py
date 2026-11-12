@@ -119,7 +119,8 @@ class SebasApp:
 
         import run_sebas as _rs
 
-        self.discord = _rs.start_discord(self.brain)
+        self.discord = _rs.start_discord(self.brain, self.ears, self.mouth)
+        _rs.start_calls(self.ears, self.mouth)
         Scheduler(announce, self._converse, self.discord).start()
         threading.Thread(target=self._serve_typed_requests, daemon=True).start()
         if self.voice and self.listener is not None:
@@ -152,6 +153,10 @@ class SebasApp:
         while True:
             text = self._requests.get()
             emit("transcript", role="user", text=text)
+            import sebas_calls
+
+            if sebas_calls.handle(text):
+                continue
             from voice_pipeline.name_listener import is_sleep_request
 
             if is_sleep_request(text):
@@ -230,7 +235,16 @@ class SebasApp:
             "voice": bool(self.voice and self.listener is not None),
             "study": study.snapshot(),
             "wellbeing": wellbeing.WELLBEING.status(),
+            "call": _call_status(),
         }
+
+
+def _call_status() -> dict[str, Any]:
+    import sebas_calls
+
+    desk = sebas_calls.DESK
+    return {"state": desk.state, "route": desk.route, "name": sebas_calls.master_name(),
+            "names": sebas_calls.master_names()}
 
 
 class Api:
@@ -287,6 +301,28 @@ class Api:
         from custom_tools import study
 
         study.record_quiz(subject, int(score), int(total))
+
+    # --- calls: the panel's buttons ---------------------------------------------
+    def call_take(self, brief: str = "", name: str = "") -> str:
+        import sebas_calls
+
+        return sebas_calls.DESK.take(str(brief or "")[:300], str(name or "")[:40])
+
+    def call_back(self) -> str:
+        import sebas_calls
+
+        return sebas_calls.DESK.step_back()
+
+    def call_captions(self, on: bool) -> str:
+        import sebas_calls
+
+        return sebas_calls.DESK.captions(bool(on))
+
+    def call_relay(self, message: str) -> str:
+        import sebas_calls
+
+        message = str(message or "").strip()[:300]
+        return sebas_calls.DESK.relay(message) if message else ""
 
     def log_water(self) -> int:
         from custom_tools import wellbeing

@@ -13,6 +13,9 @@ rem Say "Sebas, let's play pong" (or press Games) for the built-in games: no AI,
 rem Study mode: "Sebas, start a pomodoro on DBMS", "make flashcards for DBMS", "quiz me on DBMS".
 rem Wellbeing: stretch, water and 20-20-20 eye nudges; "pause the reminders for an hour".
 rem If DISCORD_BOT_TOKEN is set, the Discord bot starts too (and stops when Sebas closes).
+rem   On Discord: send a voice note in #sebas for a spoken reply; join "Sebas Voice" and he speaks there.
+rem On a call (WhatsApp, Instagram, Meet...): answer it, then "Sebas, take this call" or Ctrl+Alt+C; "step back" to return.
+rem   So callers hear him: install VB-Cable once, choose "CABLE Output" as the call app's mic, and say "Sebas, test call audio".
 rem Thinks with Gemini (GEMINI_API_KEY, then GEMINI_API_KEY_2 in sebas_main\.env): Flash
 rem first, then the lighter Flash-Lite models; when those are spent too, or offline,
 rem with a local model through Ollama.

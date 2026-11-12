@@ -53,12 +53,35 @@ def known_folder(name: str) -> Path:
 
 # --------------------------------------------------------------------------- screen
 
-def gemini_once(contents: list, *, need: str, timeout_ms: int = 40_000, json_mode: bool = False) -> str:
+_LADDER_SECONDS = 1800
+_ladders: dict[str, tuple[float, list[str], list[str]]] = {}
+
+
+def _model_ladders(key: str) -> tuple[list[str], list[str]]:
+    """Flash and Flash-Lite models for a key, remembered for half an hour: asking
+    Google for them took ~3.6 s, before every request."""
+    import hashlib
+    import time
+
+    from sebas_brain import choose_gemini_models, choose_lite_models
+
+    tag = hashlib.sha256(key.encode()).hexdigest()[:12]  # never the key itself
+    cached = _ladders.get(tag)
+    if cached and time.monotonic() - cached[0] < _LADDER_SECONDS:
+        return cached[1], cached[2]
+    flash, lite = choose_gemini_models(key), choose_lite_models(key)
+    _ladders[tag] = (time.monotonic(), flash, lite)
+    return flash, lite
+
+
+def gemini_once(contents: list, *, need: str, timeout_ms: int = 40_000, json_mode: bool = False,
+                lite_first: bool = False) -> str:
     """One stand-alone Gemini request (outside the conversation), trying each key
-    and model in turn like the brain does. ``need`` names the task for errors."""
+    and model in turn like the brain does. ``need`` names the task for errors.
+    ``lite_first``: speed over depth (a live call), so Flash-Lite is tried first."""
     from google import genai
 
-    from sebas_brain import choose_gemini_models, choose_lite_models, classify_failure
+    from sebas_brain import classify_failure
 
     keys = [k for k in (os.environ.get("GEMINI_API_KEY", ""), os.environ.get("GEMINI_API_KEY_2", "")) if k.strip()]
     if not keys:
@@ -67,7 +90,8 @@ def gemini_once(contents: list, *, need: str, timeout_ms: int = 40_000, json_mod
     for key in keys:
         client = genai.Client(api_key=key, http_options={"timeout": timeout_ms})
         # Flash first, then Flash-Lite (far higher free limits) once Flash is spent
-        for model in choose_gemini_models(key) + choose_lite_models(key):
+        flash, lite = _model_ladders(key)
+        for model in (lite + flash if lite_first else flash + lite):
             try:
                 config = {"response_mime_type": "application/json"} if json_mode else None
                 reply = client.models.generate_content(model=model, contents=contents, config=config)
