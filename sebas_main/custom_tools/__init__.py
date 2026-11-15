@@ -10,6 +10,7 @@ from custom_tools import (  # noqa: F401
     coding,
     desk,
     devops_manager,
+    errands,
     files,
     github_assistant,
     household,

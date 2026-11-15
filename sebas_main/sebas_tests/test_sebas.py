@@ -126,6 +126,7 @@ class BrainChain(unittest.TestCase):
             mock.patch.object(sebas_brain.Brain, "_spent_path", staticmethod(lambda: spent)),
             mock.patch.object(sebas_brain.Brain, "_start_local_keepalive", lambda *a, **k: None),
             mock.patch.object(sebas_brain.Brain, "_ask_once", fake_ask),
+            mock.patch.object(sebas_brain, "note_gemini_use", lambda units=1: None),  # not against the real budget
         ]
         for p in patches:
             p.start()

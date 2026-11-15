@@ -213,7 +213,7 @@ class SebasApp:
         return True
 
     def snapshot(self) -> dict[str, Any]:
-        from custom_tools import coding, household, laptop, memory, standing, study, wellbeing
+        from custom_tools import coding, errands, household, laptop, memory, standing, study, wellbeing
         from custom_tools.household import describe_due
 
         with laptop._reminders_lock:
@@ -235,6 +235,7 @@ class SebasApp:
             "voice": bool(self.voice and self.listener is not None),
             "study": study.snapshot(),
             "wellbeing": wellbeing.WELLBEING.status(),
+            "errand": errands.snapshot(),
             "standing": ([coding.snapshot()] if coding.snapshot() else []) + standing.snapshot()[:8],
             "call": _call_status(),
         }

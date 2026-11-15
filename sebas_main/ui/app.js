@@ -30,6 +30,7 @@ const TOOL_TEXT = {
   stop_coding: "Recalling the coding agent", discard_coding: "Discarding the agent's work",
   find_files: "Searching the cabinets", open_file: "Fetching a document", manage_files: "Putting the files in order",
   delete_files: "Clearing papers away", undo_file_action: "Putting things back as they were",
+  start_errand: "Setting out on an errand", errand: "Consulting the errand book",
   type_text: "Taking dictation", arrange_windows: "Arranging the desk", close_apps: "Closing up", press_keys: "Pressing the keys",
 };
 
@@ -325,10 +326,21 @@ function fillList(id, items, empty, render) {
   if (!items.length) { const li = document.createElement("li"); li.className = "empty"; li.textContent = empty; ul.appendChild(li); return; }
   items.forEach((it) => ul.appendChild(render(it)));
 }
+const ERRAND_MARK = { pending: "·", running: "…", waiting: "your yes?", done: "✓", failed: "✕", skipped: "–" };
+function showErrand(e) {
+  const box = $("#errand-box"); if (!box) return;
+  box.hidden = !e; if (!e) return;
+  $("#errand-title").textContent = `${e.title}${e.state === "running" ? "" : " · " + e.state}`;
+  fillList("#errand", e.steps || [], "", (st) => {
+    const li = document.createElement("li"); li.append(st.say); if (st.state === "failed") li.className = "overdue";
+    const w = document.createElement("span"); w.className = "when"; w.textContent = ERRAND_MARK[st.state] || st.state; li.appendChild(w); return li;
+  });
+}
 let lastSnapshot = null;
 function applySnapshot(s) {
   if (!s) return;
   lastSnapshot = s;
+  showErrand(s.errand);
   if (s.mode) setMode(s.mode, s.model);
   $("#tel-voice").textContent = s.voice ? "ON" : "OFF";
   fillList("#reminders", s.reminders || [], "No engagements pending.", (r) => {
@@ -375,6 +387,7 @@ window.Sebas = {
       case "egg": Eggs.play(evt.name); break;
       case "game": if (typeof Games !== "undefined") Games.show(evt.name); break;  // a top-level const is not on window
       case "wellbeing": if (typeof Wellbeing !== "undefined") Wellbeing.nudge(evt.nudge, evt.line); break;
+      case "errand": showErrand(evt.errand); break;
       case "call": if (typeof Calls !== "undefined") Calls.setState(evt); break;
       case "call_line": if (typeof Calls !== "undefined") Calls.line(evt.who, evt.text); break;
       case "call_ask": if (typeof Calls !== "undefined") Calls.askName(evt.names); break;
@@ -437,6 +450,9 @@ const Demo = {
       memory: ["The user prefers tea over coffee.", "Main project: the portfolio site.", "Prefers metric units."],
       agenda: [{ task: "Submit the DBMS assignment", due: "Fri 13 Nov 05:00 PM" }, { task: "Renew the domain", due: "today", overdue: false }],
       spent_today: 240, spent_month: 6850,
+      errand: { title: "DBMS exam preparation", state: "running", engine: "gemini", steps: [
+        { say: "Note the exam date", state: "done" }, { say: "Find the DBMS notes", state: "done" },
+        { say: "Make flashcards from them", state: "running" }, { say: "Add three revision tasks", state: "pending" }] },
       standing: [{ label: "Morning desk", detail: "09:00 · weekdays" }, { label: "The next Vercel deployment to finish", detail: "watching" }],
       study: { session: null, focus_today: 50, exams: [{ subject: "DBMS", days: 12 }, { subject: "Operating Systems", days: 3 }],
                decks: [{ subject: "DBMS", cards: 20, due: 6, quiz: 10 }] },

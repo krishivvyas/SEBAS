@@ -163,6 +163,52 @@ def classify_failure(exc: BaseException) -> tuple[str, float] | None:
 
 
 # ---------------------------------------------------------------------------
+# Today's Gemini budget
+# ---------------------------------------------------------------------------
+# Google does not report how much free quota is left, so Sebas keeps his own
+# count: one unit per request he sends to Gemini (a conversation turn, or a
+# stand-alone request such as an errand's judgment step). Errands use it to
+# decide when to think on the local model instead (custom_tools/errands.py).
+
+def _budget_path():
+    from openjarvis.core.paths import get_data_dir
+
+    return get_data_dir() / "sebas" / "gemini_budget.json"
+
+
+def _budget_day() -> str:
+    return datetime.now(ZoneInfo("America/Los_Angeles")).date().isoformat()  # quotas reset at Pacific midnight
+
+
+def gemini_budget() -> int:
+    try:
+        return max(1, int(os.environ.get("SEBAS_GEMINI_DAILY_BUDGET") or 60))
+    except ValueError:
+        return 60
+
+
+def gemini_used() -> int:
+    try:
+        data = json.loads(_budget_path().read_text("utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return 0
+    return int(data.get("used", 0)) if data.get("day") == _budget_day() else 0
+
+
+def note_gemini_use(units: int = 1) -> None:
+    try:
+        path = _budget_path()
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(json.dumps({"day": _budget_day(), "used": gemini_used() + units}), "utf-8")
+    except OSError:
+        logger.debug("Could not record Gemini use", exc_info=True)
+
+
+def gemini_remaining() -> int:
+    return max(0, gemini_budget() - gemini_used())
+
+
+# ---------------------------------------------------------------------------
 # Local (Ollama)
 # ---------------------------------------------------------------------------
 
@@ -489,18 +535,17 @@ class Brain:
 
     def ask(self, text: str) -> str:
         with self._lock:
-            from custom_tools import _base
+            import sebas_actions
 
-            if not _base.REMOTE_REQUEST:  # a parked risky action: only the user's yes releases it
-                import sebas_actions
+            # A parked risky action: only the user's own yes releases it (at the
+            # laptop or, since the bot serves him alone, on Discord).
+            settled = sebas_actions.answer(re.sub(r"^\(Written to you on Discord[^)]*\)\s*", "", text))
+            if settled is not None:
+                from openjarvis.core.types import Message, Role
 
-                settled = sebas_actions.answer(text)
-                if settled is not None:
-                    from openjarvis.core.types import Message, Role
-
-                    self._history += [Message(role=Role.USER, content=text), Message(role=Role.ASSISTANT, content=settled)]
-                    del self._history[:-_MAX_HISTORY_MESSAGES]
-                    return settled
+                self._history += [Message(role=Role.USER, content=text), Message(role=Role.ASSISTANT, content=settled)]
+                del self._history[:-_MAX_HISTORY_MESSAGES]
+                return settled
             return self._ask(text)
 
     def _ask(self, text: str) -> str:
@@ -515,6 +560,8 @@ class Brain:
             try:
                 reply = self._ask_once(provider, text)
                 provider.busy_strikes.pop(model, None)
+                if not provider.is_local:
+                    note_gemini_use()
                 break
             except Exception as exc:
                 if provider.is_local:

@@ -66,11 +66,16 @@ def recent(limit: int = 20) -> list[dict[str, Any]]:
     return entries
 
 
-def request(tool: str, params: dict[str, Any], summary: str) -> str:
-    """Park a risky action. Returns what the model is told."""
+def request(tool: str, params: dict[str, Any], summary: str, on_settled=None) -> str:
+    """Park a risky action. Returns what the model is told. ``on_settled(outcome,
+    text, ok)`` is called once it is decided: outcome is "yes", "no", "dropped"
+    or "lapsed" (a background errand waits on this)."""
     global _pending
     with _lock:
-        _pending = {"tool": tool, "params": params, "summary": summary, "asked": time.monotonic()}
+        previous = _pending
+        _pending = {"tool": tool, "params": params, "summary": summary, "asked": time.monotonic(),
+                    "on_settled": on_settled}
+    _settle(previous, "dropped", "")  # a newer request takes its place
     return (
         f"NOT DONE YET. This is hard to undo, so it needs the master's spoken yes: {summary} "
         "Ask him, in one short sentence, whether to proceed. Do not call the tool again and do "
@@ -99,13 +104,26 @@ def answer(text: str) -> str | None:
     said = _normalise(text)
     if said in _NO:
         log(pending["tool"], f"cancelled: {pending['summary']}", ok=False)
+        _settle(pending, "no", "")
         return "Very good, sir. I have left it as it was."
     if said not in _YES:
+        _settle(pending, "dropped", "")
         return None
     if time.monotonic() - pending["asked"] > CONFIRM_SECONDS:
+        _settle(pending, "lapsed", "")
         return "That request has lapsed, sir. Do ask again should you still wish it."
     from openjarvis.core.registry import ToolRegistry
 
     result = ToolRegistry.create(pending["tool"]).run_now(**pending["params"])
     log(pending["tool"], f"{pending['summary']} -> {result.content}", ok=result.success)
+    _settle(pending, "yes", result.content, result.success)
     return f"Done, sir. {result.content}" if result.success else f"I regret it did not succeed, sir. {result.content}"
+
+
+def _settle(pending: dict[str, Any] | None, outcome: str, text: str, ok: bool = False) -> None:
+    callback = pending.get("on_settled") if pending else None
+    if callback is not None:
+        try:
+            callback(outcome, text, ok)
+        except Exception:
+            logger.exception("A confirmation callback failed")

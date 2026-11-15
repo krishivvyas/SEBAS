@@ -14,6 +14,8 @@ rem Study mode: "Sebas, start a pomodoro on DBMS", "make flashcards for DBMS", "
 rem Wellbeing: stretch, water and 20-20-20 eye nudges; "pause the reminders for an hour".
 rem Standing orders: "Sebas, tell me when the deploy finishes" / "...when the download finishes" / "watch Elden Ring on Steam";
 rem   "every weekday at 9, open my workspace"; "what are you watching for?"; "cancel the Steam watch".
+rem Errands: "Sebas, set up my week: add these tasks, log this expense, then read me my agenda" (a background checklist);
+rem   "save that as my evening wrap-up"; "run my evening wrap-up". Big errands late in the day think on the local model.
 rem Coding: "Sebas, have Claude fix the failing test in the sebas project" (a new branch, never committed; needs Claude Code);
 rem   "how is Claude getting on?"; "stop Claude"; "discard Claude's changes".
 rem Files: "find my DBMS assignment"; "move the PDFs from Downloads to Documents/College"; "undo that"; deleting asks first (Recycle Bin).

@@ -118,6 +118,12 @@ Each evening at 21:30 I ask how your day went; answer here and I'll save it. On 
 *What are you watching for?* · *cancel the Steam watch* · *cancel the morning routine*
 I tell you once (here in #alerts too) and then stop watching. Watches survive a restart and lapse on their own if nothing happens.""",
 
+"""## Errands (asks for your **yes**)
+*Prepare me for the DBMS exam on the 20th* · *wrap up for the day: log what I did, list tomorrow's tasks and tidy Downloads*
+A request that needs several steps becomes one errand: I plan it, work through it in the background (a checklist shows on the laptop), and report in #alerts when it is done. A plan that deletes or closes anything waits for a second yes.
+*How is the errand going?* · *stop the errand* · *save that as my evening wrap-up* · *run my evening wrap-up* · *what errands have I saved?*
+Steps that need thought go to Gemini, or to the laptop's own model when the errand would use more than a quarter of today's remaining Gemini quota (slower, but free). *Do it on the local model* / *use Gemini for this* overrides that.""",
+
 """## Coding agent (asks for your **yes**)
 *Have Claude fix the failing test in the sebas project* · *have Claude add a dark mode toggle to the portfolio*
 I make a branch `sebas/<task>` in that project (it must be in `laptop.toml`, with nothing uncommitted), and Claude Code works there in the background: it may edit files and run the tests, lint and build, but never commits or pushes. I tell you when it finishes, with a short summary; you review the branch.

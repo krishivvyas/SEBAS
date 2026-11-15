@@ -99,6 +99,9 @@ def gemini_once(contents: list, *, need: str, timeout_ms: int = 40_000, json_mod
             try:
                 config = {"response_mime_type": "application/json"} if json_mode else None
                 reply = client.models.generate_content(model=model, contents=contents, config=config)
+                from sebas_brain import note_gemini_use
+
+                note_gemini_use()  # counted against today's budget, like a conversation turn
                 return (reply.text or "").strip()
             except Exception as exc:  # quota, overload: try the next model, then the next key
                 if classify_failure(exc) is None:

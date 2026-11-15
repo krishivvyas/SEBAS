@@ -235,6 +235,8 @@ class HandledCall(unittest.TestCase):
             mock.patch("voice_pipeline.call_audio.find_cable", return_value=None),
             mock.patch.object(calls, "emit", lambda kind, **d: self.events.append((kind, d))),
             mock.patch.object(calls, "_warm_gemini", lambda: None),           # offline
+            # a summary thread can outlive a test's own stub: it must never reach the real Gemini
+            mock.patch.object(calls, "_gemini", side_effect=RuntimeError("offline in tests")),
             mock.patch.dict("os.environ", {"SEBAS_MASTER_NAME": "Arjun"}),
         ]
         for p in patches:
