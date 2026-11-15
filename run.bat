@@ -12,6 +12,12 @@ rem Say "Sebas, sleep" (or type it) and he says goodbye and closes.
 rem Say "Sebas, let's play pong" (or press Games) for the built-in games: no AI, no quota.
 rem Study mode: "Sebas, start a pomodoro on DBMS", "make flashcards for DBMS", "quiz me on DBMS".
 rem Wellbeing: stretch, water and 20-20-20 eye nudges; "pause the reminders for an hour".
+rem Standing orders: "Sebas, tell me when the deploy finishes" / "...when the download finishes" / "watch Elden Ring on Steam";
+rem   "every weekday at 9, open my workspace"; "what are you watching for?"; "cancel the Steam watch".
+rem Coding: "Sebas, have Claude fix the failing test in the sebas project" (a new branch, never committed; needs Claude Code);
+rem   "how is Claude getting on?"; "stop Claude"; "discard Claude's changes".
+rem Files: "find my DBMS assignment"; "move the PDFs from Downloads to Documents/College"; "undo that"; deleting asks first (Recycle Bin).
+rem Desk: "type this: ..."; "put Chrome on the left and Code on the right"; "close everything except Spotify" (asks first); "press Ctrl+S".
 rem If DISCORD_BOT_TOKEN is set, the Discord bot starts too (and stops when Sebas closes).
 rem   On Discord: send a voice note in #sebas for a spoken reply; join "Sebas Voice" and he speaks there.
 rem On a call (WhatsApp, Instagram, Meet...): answer it, then "Sebas, take this call" or Ctrl+Alt+C; "step back" to return.

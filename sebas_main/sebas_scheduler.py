@@ -9,6 +9,8 @@
 - Exam countdown: a word a week, three days and one day before each exam, and on the day.
 - Wellbeing: break and posture nudges, water reminders, and 20-20-20 eye cues
   (custom_tools/wellbeing.py); spoken at the laptop only, never sent to Discord.
+- Standing orders (custom_tools/standing.py): the user's own timed routines, and
+  watchers that report once when something happens (a deploy, a price, a download).
 - Quiet butler: during a Pomodoro focus block, non-urgent alerts and the
   briefings wait; they are delivered together at the break.
 
@@ -174,7 +176,8 @@ class Scheduler:
     def _run(self) -> None:
         time.sleep(20)  # let Sebas finish starting up first
         while True:
-            for job in (self._deadlines, self._calendar, self._guardian, self._routines, self._anime, self._exams, self._wellbeing):
+            for job in (self._deadlines, self._calendar, self._guardian, self._routines, self._anime, self._exams,
+                        self._wellbeing, self._standing):
                 try:
                     job(datetime.now())
                 except Exception:
@@ -204,6 +207,23 @@ class Scheduler:
         elif evening_due and self._once("evening", today):
             weekly = now.weekday() == 6
             self._converse(RECAP_PROMPT if weekly else EVENING_PROMPT, True, "Weekly recap" if weekly else "Evening check-in")
+
+    def _standing(self, now: datetime) -> None:
+        """Watchers ("tell me when...") and the user's own timed routines."""
+        from custom_tools import standing
+        from custom_tools.study import focus_active
+
+        import sebas_calls
+
+        for message in standing.poll(now):
+            self._say(message, urgent=True)  # he asked to be told: it does not wait for the break
+        if focus_active() or sebas_calls.DESK.active() or idle_seconds() > _PRESENT_IDLE_SECONDS:
+            return  # routines wait until the user is at the laptop and free
+        for routine in standing.due_routines(now):
+            import sebas_actions
+
+            sebas_actions.log("routine", routine["name"])
+            self._converse(standing.routine_prompt(routine), False, f"Standing order: {routine['name']}")
 
     def _deadlines(self, now: datetime) -> None:
         from custom_tools.household import describe_due, open_tasks

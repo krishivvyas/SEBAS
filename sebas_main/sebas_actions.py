@@ -1,0 +1,111 @@
+"""What Sebas does, as opposed to what he says: one gate and one log.
+
+The gate. A tool marked ``risky`` (hard to undo: deleting, overwriting, closing,
+sending) does not run when the model calls it at the laptop. It is parked here
+and the model is told to ask for a yes. Only the user's *next* request can
+release it: ``answer()`` is consulted before a request reaches the model, so the
+model cannot confirm on the user's behalf. Anything other than a yes or a no
+drops the parked action. From Discord, the existing remote gate applies instead.
+
+The log. Every action worth a record is appended to
+~/.openjarvis/sebas/actions.jsonl (one JSON object per line), so "what did you
+do while I was away?" has an answer after the fact.
+"""
+
+from __future__ import annotations
+
+import json
+import logging
+import re
+import threading
+import time
+from datetime import datetime
+from typing import Any
+
+from openjarvis.core.paths import get_data_dir
+
+logger = logging.getLogger("sebas.actions")
+
+CONFIRM_SECONDS = 120
+_YES = {"yes", "yeah", "yep", "yes please", "yes do it", "confirm", "confirmed", "do it", "go ahead",
+        "proceed", "please do", "sure", "yes go ahead", "yes sebas", "affirmative"}
+_NO = {"no", "nope", "cancel", "cancel it", "never mind", "nevermind", "don't", "do not", "stop",
+       "no thank you", "no thanks", "leave it", "no sebas"}
+
+_lock = threading.Lock()
+_pending: dict[str, Any] | None = None
+
+
+def _log_path():
+    return get_data_dir() / "sebas" / "actions.jsonl"
+
+
+def log(action: str, detail: str, ok: bool = True) -> None:
+    """Record something Sebas did. Never raises: a log is not worth a failure."""
+    entry = {"at": datetime.now().isoformat(timespec="seconds"), "action": action, "detail": detail[:500], "ok": ok}
+    try:
+        path = _log_path()
+        path.parent.mkdir(parents=True, exist_ok=True)
+        with open(path, "a", encoding="utf-8") as fh:
+            fh.write(json.dumps(entry, ensure_ascii=False) + "\n")
+    except OSError:
+        logger.debug("Could not write the action log", exc_info=True)
+
+
+def recent(limit: int = 20) -> list[dict[str, Any]]:
+    try:
+        lines = _log_path().read_text("utf-8").splitlines()[-limit:]
+    except OSError:
+        return []
+    entries = []
+    for line in lines:
+        try:
+            entries.append(json.loads(line))
+        except json.JSONDecodeError:
+            continue
+    return entries
+
+
+def request(tool: str, params: dict[str, Any], summary: str) -> str:
+    """Park a risky action. Returns what the model is told."""
+    global _pending
+    with _lock:
+        _pending = {"tool": tool, "params": params, "summary": summary, "asked": time.monotonic()}
+    return (
+        f"NOT DONE YET. This is hard to undo, so it needs the master's spoken yes: {summary} "
+        "Ask him, in one short sentence, whether to proceed. Do not call the tool again and do "
+        "not say it is done; his yes will carry it out."
+    )
+
+
+def pending_summary() -> str:
+    with _lock:
+        return _pending["summary"] if _pending else ""
+
+
+def _normalise(text: str) -> str:
+    return " ".join(re.sub(r"[^a-z' ]", " ", text.lower()).split())
+
+
+def answer(text: str) -> str | None:
+    """The user's next words after a parked action. A yes runs it and returns the
+    result; a no cancels it; anything else drops it and returns None, so the
+    request goes to the model as usual."""
+    global _pending
+    with _lock:
+        pending, _pending = _pending, None
+    if pending is None:
+        return None
+    said = _normalise(text)
+    if said in _NO:
+        log(pending["tool"], f"cancelled: {pending['summary']}", ok=False)
+        return "Very good, sir. I have left it as it was."
+    if said not in _YES:
+        return None
+    if time.monotonic() - pending["asked"] > CONFIRM_SECONDS:
+        return "That request has lapsed, sir. Do ask again should you still wish it."
+    from openjarvis.core.registry import ToolRegistry
+
+    result = ToolRegistry.create(pending["tool"]).run_now(**pending["params"])
+    log(pending["tool"], f"{pending['summary']} -> {result.content}", ok=result.success)
+    return f"Done, sir. {result.content}" if result.success else f"I regret it did not succeed, sir. {result.content}"

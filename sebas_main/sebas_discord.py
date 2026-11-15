@@ -110,6 +110,20 @@ Each evening at 21:30 I ask how your day went; answer here and I'll save it. On 
 *What reminders are pending?* · lists them
 (Reminders live while I'm running; they don't survive a restart.)""",
 
+"""## Standing orders & watches
+*Tell me when the Vercel deploy finishes* · *tell me when the checks on my PR pass* · *tell me when the workflow on krishivvyas/SEBAS finishes*
+*Watch Elden Ring on Steam until it drops below 1500* (or *until it goes on sale*) · *tell me when <link> changes* · *tell me when <link> says "in stock"*
+*Tell me when the download finishes* · *tell me when a PDF appears in Downloads* · *tell me when the battery is full* · *tell me when Blender closes* · *tell me when the render finishes*
+*Every weekday at 9, open my workspace and read me my pull requests* · a routine I carry out at that time when you're at the laptop
+*What are you watching for?* · *cancel the Steam watch* · *cancel the morning routine*
+I tell you once (here in #alerts too) and then stop watching. Watches survive a restart and lapse on their own if nothing happens.""",
+
+"""## Coding agent (asks for your **yes**)
+*Have Claude fix the failing test in the sebas project* · *have Claude add a dark mode toggle to the portfolio*
+I make a branch `sebas/<task>` in that project (it must be in `laptop.toml`, with nothing uncommitted), and Claude Code works there in the background: it may edit files and run the tests, lint and build, but never commits or pushes. I tell you when it finishes, with a short summary; you review the branch.
+*How is Claude getting on?* · *what did Claude change?* · *stop Claude* · *discard Claude's changes* (asks first; cannot be undone)
+If Claude Code is unavailable I pass the task to Antigravity's agent in the editor instead, where it follows its own approval settings.""",
+
 """## Information
 *What's the weather?* · Gandhinagar, or ask about any city
 *Give me my morning briefing* · time, weather, agenda (calendar after December)
@@ -130,6 +144,13 @@ Only apps, sites and folders listed in `laptop.toml` can be opened. Turning Wi-F
 *Summarise what I copied* · *translate my clipboard into Hindi* · *explain the code I copied*
 *Put that on my clipboard* · copies my answer so you can paste it
 *Tidy my Downloads* · I show the plan first and move nothing until you agree · *undo the tidy*""",
+
+"""## Files & the desk (each asks for your **yes**)
+*Find my DBMS assignment* · *open it* · searches Downloads, Desktop, Documents, Pictures, Videos and Music by name
+*Move the PDFs from Downloads to Documents/College* · *rename it to report* · *make a folder called Sem 5 in Documents* · *zip the College folder* · *undo that*
+*Delete the installers in Downloads* · goes to the Recycle Bin
+Nothing is overwritten, programs are never opened, and code projects (any git repository) are left alone.
+*Type this: ...* · *put Chrome on the left and Code on the right* · *minimise everything* · *switch to Spotify* · *close Chrome* · *close everything except Spotify* · *press Ctrl+S*""",
 
 """## Reading & notes (at the laptop)
 *Read this article aloud: <link>* · *read my clipboard aloud* · *read the PDF at C:/Users/krish/Downloads/notes.pdf* · *stop reading*

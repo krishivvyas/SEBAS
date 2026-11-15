@@ -24,6 +24,13 @@ const TOOL_TEXT = {
   run_shortcut: "Performing a routine", set_volume: "Adjusting the volume", lock_screen: "Securing the screen",
   set_reminder: "Noting an engagement", list_reminders: "Reviewing the engagements",
   remember: "Committing to memory", forget: "Striking from memory",
+  add_routine: "Entering a standing order", watch_for: "Posting a watch", list_standing: "Reviewing the standing orders",
+  cancel_standing: "Striking a standing order",
+  delegate_coding: "Engaging a coding agent", coding_status: "Looking in on the coding agent",
+  stop_coding: "Recalling the coding agent", discard_coding: "Discarding the agent's work",
+  find_files: "Searching the cabinets", open_file: "Fetching a document", manage_files: "Putting the files in order",
+  delete_files: "Clearing papers away", undo_file_action: "Putting things back as they were",
+  type_text: "Taking dictation", arrange_windows: "Arranging the desk", close_apps: "Closing up", press_keys: "Pressing the keys",
 };
 
 /* ---------------- Sound (synthesised; no audio files) ---------------- */
@@ -327,6 +334,9 @@ function applySnapshot(s) {
   fillList("#reminders", s.reminders || [], "No engagements pending.", (r) => {
     const li = document.createElement("li"); li.append(r.text); const w = document.createElement("span"); w.className = "when"; w.textContent = relTime(r.due); li.appendChild(w); return li;
   });
+  fillList("#standing", s.standing || [], "No standing orders.", (o) => {
+    const li = document.createElement("li"); li.append(o.label); const w = document.createElement("span"); w.className = "when"; w.textContent = o.detail; li.appendChild(w); return li;
+  });
   fillList("#memory", (s.memory || []).slice(-6).reverse(), "Nothing committed to memory.", (f) => { const li = document.createElement("li"); li.textContent = f; return li; });
   fillList("#agenda", s.agenda || [], "The agenda is clear.", (task) => {
     const li = document.createElement("li"); li.append(task.task); if (task.overdue) li.className = "overdue";
@@ -427,6 +437,7 @@ const Demo = {
       memory: ["The user prefers tea over coffee.", "Main project: the portfolio site.", "Prefers metric units."],
       agenda: [{ task: "Submit the DBMS assignment", due: "Fri 13 Nov 05:00 PM" }, { task: "Renew the domain", due: "today", overdue: false }],
       spent_today: 240, spent_month: 6850,
+      standing: [{ label: "Morning desk", detail: "09:00 · weekdays" }, { label: "The next Vercel deployment to finish", detail: "watching" }],
       study: { session: null, focus_today: 50, exams: [{ subject: "DBMS", days: 12 }, { subject: "Operating Systems", days: 3 }],
                decks: [{ subject: "DBMS", cards: 20, due: 6, quiz: 10 }] },
       wellbeing: { water_today: 3, active_minutes: 42 } });

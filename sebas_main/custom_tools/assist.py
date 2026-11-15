@@ -32,6 +32,10 @@ from custom_tools._base import SebasTool, ToolError
 _FOLDER_IDS = {
     "downloads": "{374DE290-123F-4565-9164-39C4925E467B}",
     "documents": "{FDD39AD0-238F-46AF-ADB4-6C85480369C7}",
+    "desktop": "{B4BFCC3A-DB2C-424C-B029-7FE99A87C641}",
+    "pictures": "{33E28130-4E1E-4676-835A-98395C3BC3BB}",
+    "videos": "{18989B1D-99B5-455B-841C-AB7C74E4DDFC}",
+    "music": "{4BD8D571-6D19-48D3-BE97-422220080E43}",
 }
 
 

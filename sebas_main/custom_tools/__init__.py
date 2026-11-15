@@ -7,7 +7,10 @@ configs/sebas/config.toml.
 from custom_tools import (  # noqa: F401
     anime,
     assist,
+    coding,
+    desk,
     devops_manager,
+    files,
     github_assistant,
     household,
     laptop,
@@ -16,6 +19,7 @@ from custom_tools import (  # noqa: F401
     memory,
     morning_briefing,
     notes,
+    standing,
     study,
     wellbeing,
 )

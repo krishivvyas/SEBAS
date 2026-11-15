@@ -76,6 +76,12 @@ class SebasTool(BaseTool):
     parameters: ClassVar[dict[str, Any]] = {"type": "object", "properties": {}}
     timeout_seconds: ClassVar[float] = 30.0
     acts_on_laptop: ClassVar[bool] = False  # needs confirmation when asked remotely
+    risky: ClassVar[bool] = False  # hard to undo: needs a yes at the laptop too (sebas_actions)
+
+    def confirm_summary(self, **params: Any) -> str:
+        """One sentence saying what a risky call would do, for the yes/no question."""
+        details = ", ".join(f"{k}: {v}" for k, v in params.items() if v not in (None, ""))
+        return f"{self.description.split('.')[0]}" + (f" ({details})." if details else ".")
 
     @property
     def spec(self) -> ToolSpec:
@@ -94,8 +100,13 @@ class SebasTool(BaseTool):
         raise NotImplementedError
 
     def execute(self, **params: Any) -> ToolResult:
-        if REMOTE_REQUEST and self.acts_on_laptop and confirm_remote is not None:
+        if REMOTE_REQUEST and (self.acts_on_laptop or self.risky) and confirm_remote is not None:
             return ToolResult(tool_name=self.name, content=confirm_remote(self.name, params, self.description))
+        if self.risky:
+            import sebas_actions
+
+            return ToolResult(tool_name=self.name,
+                              content=sebas_actions.request(self.name, params, self.confirm_summary(**params)))
         return self.run_now(**params)
 
     def run_now(self, **params: Any) -> ToolResult:

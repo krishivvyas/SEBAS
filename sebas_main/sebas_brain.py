@@ -489,6 +489,18 @@ class Brain:
 
     def ask(self, text: str) -> str:
         with self._lock:
+            from custom_tools import _base
+
+            if not _base.REMOTE_REQUEST:  # a parked risky action: only the user's yes releases it
+                import sebas_actions
+
+                settled = sebas_actions.answer(text)
+                if settled is not None:
+                    from openjarvis.core.types import Message, Role
+
+                    self._history += [Message(role=Role.USER, content=text), Message(role=Role.ASSISTANT, content=settled)]
+                    del self._history[:-_MAX_HISTORY_MESSAGES]
+                    return settled
             return self._ask(text)
 
     def _ask(self, text: str) -> str:
