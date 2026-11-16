@@ -16,6 +16,10 @@ rem Standing orders: "Sebas, tell me when the deploy finishes" / "...when the do
 rem   "every weekday at 9, open my workspace"; "what are you watching for?"; "cancel the Steam watch".
 rem Errands: "Sebas, set up my week: add these tasks, log this expense, then read me my agenda" (a background checklist);
 rem   "save that as my evening wrap-up"; "run my evening wrap-up". Big errands late in the day think on the local model.
+rem Messages: "Sebas, tell Rahul on WhatsApp I'll be late"; "email Professor Mehta that..."; "post ... in #general".
+rem   He reads back the recipient and the words and sends only on your yes. Names come from [contacts] in laptop.toml.
+rem Browser: "Sebas, go to the college portal and tell me if the timetable is out" (works in a new tab of your own Edge).
+rem   Once: edge://extensions, Developer mode, Load unpacked, pick sebas_main\browser_extension. Submitting anything asks first.
 rem Coding: "Sebas, have Claude fix the failing test in the sebas project" (a new branch, never committed; needs Claude Code);
 rem   "how is Claude getting on?"; "stop Claude"; "discard Claude's changes".
 rem Files: "find my DBMS assignment"; "move the PDFs from Downloads to Documents/College"; "undo that"; deleting asks first (Recycle Bin).

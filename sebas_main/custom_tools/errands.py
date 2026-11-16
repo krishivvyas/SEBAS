@@ -113,11 +113,16 @@ def _risky_steps(plan: list[dict[str, Any]]) -> list[dict[str, Any]]:
 
 def choose_engine(plan: list[dict[str, Any]], wish: str = "auto") -> tuple[str, str]:
     """("gemini" | "local", a sentence for the user or "") for this errand's judgment steps."""
-    from sebas_brain import choose_local_model, gemini_remaining
-
     judged = sum(1 for s in plan if s["decide"])
     if not judged:
         return "gemini", ""  # nothing to think about: plain code does it all
+    return engine_for(1 + judged, wish, "errand")  # the plan itself, plus one request per judgment step
+
+
+def engine_for(cost: int, wish: str = "auto", what: str = "errand") -> tuple[str, str]:
+    """The quarter rule, for any job expected to take ``cost`` Gemini requests."""
+    from sebas_brain import choose_local_model, gemini_remaining
+
     wish = (wish or "auto").strip().lower()
     have_key = bool(_gemini_keys())
 
@@ -135,17 +140,16 @@ def choose_engine(plan: list[dict[str, Any]], wish: str = "auto") -> tuple[str, 
         if model:
             return "local", f"As asked, I shall think it through on the local model ({model}); it will be slower."
         if not have_key:
-            raise ToolError("This errand needs judgment, and neither a Gemini key nor a local model is available.")
+            raise ToolError(f"This {what} needs judgment, and neither a Gemini key nor a local model is available.")
         return "gemini", "No local model is available, so I shall use Gemini."
     remaining = gemini_remaining()
-    cost = 1 + judged  # the plan itself, plus one request per judgment step
     if cost * 4 <= remaining:
         return "gemini", ""
     model = local_ready()
     if not model:
-        return "gemini", (f"This errand will use about {cost} of the {remaining} Gemini requests left today; "
+        return "gemini", (f"This {what} will use about {cost} of the {remaining} Gemini requests left today; "
                           "no local model is available to spare them.")
-    return "local", (f"This is a large errand for what is left of today's Gemini quota ({cost} of {remaining} requests), "
+    return "local", (f"This is a large {what} for what is left of today's Gemini quota ({cost} of {remaining} requests), "
                      f"so I shall think it through on the local model ({model}); it will be slower.")
 
 
@@ -161,13 +165,13 @@ def ask_gemini(prompt: str) -> str:
     return gemini_once([prompt], need="An errand step", json_mode=True)
 
 
-def ask_local(prompt: str) -> str:
+def ask_local(prompt: str, context_tokens: int = 4096) -> str:
     from sebas_brain import OLLAMA_URL, choose_local_model
 
     try:
         reply = httpx.post(f"{OLLAMA_URL}/api/chat", timeout=_LOCAL_TIMEOUT, json={
             "model": choose_local_model(), "stream": False, "format": "json", "keep_alive": "10m",
-            "options": {"temperature": 0, "num_ctx": 4096},
+            "options": {"temperature": 0, "num_ctx": context_tokens},
             "messages": [{"role": "user", "content": prompt}]})
         reply.raise_for_status()
         return reply.json()["message"]["content"]

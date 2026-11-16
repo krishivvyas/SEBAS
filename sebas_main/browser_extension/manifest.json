@@ -1,0 +1,11 @@
+{
+  "manifest_version": 3,
+  "name": "Sebas Browser Hands",
+  "version": "1.0.0",
+  "key": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAmhsAYxd2k0Akhb6ve4ge4y8wK3Xf1ZB/Er8rD9uwuqWcdlO3f8Sw+hYJOCPUDHMjv4mQxeD7E4V3G1LDAtqoV88yd2sX48e158XjF6UwoIRFBgs4EA0CMIWJADLzYReBge5u2hdsQ4k5swaLZG5Hzm2uoVtTH6OBg6CZ8LUFo4+uXib4dI6FZFO/U+nSeYJh70xZ5crvfdOu2EVq9/udrjiNOjfjzhu6us5AQ/YrBnyeSKCOg/uNwTgjY/3PYmnazaVWCnen9dswKVK3GDUxDa4RYnId8diDdf7TfjHc81Sga6MNwSaUBGUqKR+5JAHR4ycKJNkwq5eqsqzAGwevsQIDAQAB",
+  "description": "Lets Sebas, running on this computer, open one tab and browse in it when you ask him to. He works only in the tab he opens.",
+  "permissions": ["tabs", "scripting", "alarms", "storage"],
+  "host_permissions": ["<all_urls>"],
+  "background": { "service_worker": "background.js" },
+  "action": { "default_title": "Sebas Browser Hands" }
+}

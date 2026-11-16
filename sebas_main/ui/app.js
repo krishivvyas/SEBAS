@@ -30,6 +30,8 @@ const TOOL_TEXT = {
   stop_coding: "Recalling the coding agent", discard_coding: "Discarding the agent's work",
   find_files: "Searching the cabinets", open_file: "Fetching a document", manage_files: "Putting the files in order",
   delete_files: "Clearing papers away", undo_file_action: "Putting things back as they were",
+  send_message: "Preparing a message",
+  browse: "Stepping out to the browser", browsing: "Looking in on the browser",
   start_errand: "Setting out on an errand", errand: "Consulting the errand book",
   type_text: "Taking dictation", arrange_windows: "Arranging the desk", close_apps: "Closing up", press_keys: "Pressing the keys",
 };

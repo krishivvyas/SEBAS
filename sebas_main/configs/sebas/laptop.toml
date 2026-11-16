@@ -32,6 +32,16 @@ music = true                  # open Spotify and resume what was playing
 [files]
 folders = []                  # e.g. ['D:\College', 'C:\Users\krish\Projects\notes']
 
+# People Sebas may message by name ("tell Rahul on WhatsApp I'll be late").
+# The key is the name you say aloud; give a phone (with country code), an email,
+# or both. Anyone else needs a full number or address, said or typed.
+#   rahul = { phone = "+919876543210", email = "rahul@example.com" }
+#   "professor mehta" = { email = "mehta@college.example" }
+[contacts]
+
+[messages]
+country_code = "91"           # added to 10-digit numbers given without one
+
 # The coding delegate ("have Claude fix the failing test in sebas"). The agent
 # works on a new branch sebas/<task> in a project from [projects], never commits,
 # and may run only these commands (plus read-only git) besides editing files.

@@ -43,6 +43,7 @@ from sebas_scheduler import idle_seconds
 
 logger = logging.getLogger("sebas.discord")
 
+ACTIVE = None  # the running DiscordBridge, once started
 CATEGORY = "Sebas"
 CHANNELS = {
     "sebas": "Speak with Sebas here. Only the master's messages are answered.",
@@ -123,6 +124,18 @@ I tell you once (here in #alerts too) and then stop watching. Watches survive a 
 A request that needs several steps becomes one errand: I plan it, work through it in the background (a checklist shows on the laptop), and report in #alerts when it is done. A plan that deletes or closes anything waits for a second yes.
 *How is the errand going?* · *stop the errand* · *save that as my evening wrap-up* · *run my evening wrap-up* · *what errands have I saved?*
 Steps that need thought go to Gemini, or to the laptop's own model when the errand would use more than a quarter of today's remaining Gemini quota (slower, but free). *Do it on the local model* / *use Gemini for this* overrides that.""",
+
+"""## Messages (each asks for your **yes**)
+*Tell Rahul on WhatsApp I'll be ten minutes late* · *WhatsApp +91 98765 43210: the notes are in the drive*
+*Email Professor Mehta that I'll submit the report on Monday* · *post "meeting moved to 6" in #general*
+I write the message, show you who it is for and the exact words, and send only on your yes. Names come from `[contacts]` in `laptop.toml`; anyone else needs a full number or address.
+WhatsApp goes through WhatsApp Desktop on the laptop (it must be unlocked); email through a Gmail window in your browser (needs the Sebas extension, else I leave the draft for you); Discord posts are made as me, in your own server only.""",
+
+"""## Browser (asks for your **yes**)
+*Go to the college portal and tell me if the exam timetable is out* · *find the cheapest RTX 5070 on Amazon India* · *open my Flipkart orders and tell me when the last one arrives*
+I work in your own Edge, in a new tab, with your sign-ins (it needs the Sebas extension loaded once: edge://extensions → Developer mode → Load unpacked → `sebas_main/browser_extension`). Up to 15 actions or about 3 minutes; the answer arrives in #alerts.
+I never type passwords, card numbers or one-time codes: at a sign-in page I stop and leave the tab for you. Anything that sends, posts, books or buys waits for a further yes.
+*How is the browsing going?* · *stop browsing*""",
 
 """## Coding agent (asks for your **yes**)
 *Have Claude fix the failing test in the sebas project* · *have Claude add a dark mode toggle to the portfolio*
@@ -290,6 +303,8 @@ class DiscordBridge:
 
     # --- lifecycle -----------------------------------------------------------
     def start(self) -> None:
+        global ACTIVE
+        ACTIVE = self  # so tools can post through the running bot (custom_tools/messages.py)
         threading.Thread(target=self._run, name="sebas-discord", daemon=True).start()
         tool_base.confirm_remote = self._request_confirmation
         sebas_events.add_listener(self._on_event)
@@ -678,6 +693,32 @@ class DiscordBridge:
 
         asyncio.run_coroutine_threadsafe(post(), self.loop)
         return True
+
+    def post_to(self, channel_name: str, text: str) -> str:
+        """Post, as the bot, to any text channel of the master's own server, by name
+        (custom_tools/messages.py). Returns the channel's name; raises ValueError
+        with a plain reason if it cannot."""
+        import discord
+
+        if not self.ready.is_set():
+            raise ValueError("Discord is not connected.")
+        guild = self.channels["sebas"].guild
+        wanted = channel_name.strip().lstrip("#").lower().replace(" ", "-")
+        channel = discord.utils.get(guild.text_channels, name=wanted)
+        if channel is None:
+            names = ", ".join(c.name for c in guild.text_channels[:25])
+            raise ValueError(f"There is no channel #{wanted} in {guild.name}. Channels: {names}.")
+
+        async def post() -> None:
+            for part in _split(text):
+                await channel.send(part)
+
+        try:
+            asyncio.run_coroutine_threadsafe(post(), self.loop).result(timeout=20)
+        except Exception as exc:  # usually: the bot may not write in that channel
+            raise ValueError(f"Discord would not post in #{channel.name} ({type(exc).__name__}); "
+                             "the Sebas bot may lack permission to write there.") from exc
+        return channel.name
 
     def converse_remote(self, prompt: str, title: str) -> None:
         """A scheduled prompt held on Discord while the user is away."""

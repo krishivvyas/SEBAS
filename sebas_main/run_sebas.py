@@ -183,6 +183,12 @@ def start_calls(ears=None, mouth=None) -> None:
         sebas_calls.start_hotkey()
     except Exception:
         logger.exception("Call support unavailable")
+    try:  # the link the browser extension connects to (custom_tools/browser.py)
+        from custom_tools import browser
+
+        browser.start_bridge()
+    except Exception:
+        logger.exception("Browser link unavailable")
 
 
 def load_voice():
