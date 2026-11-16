@@ -7,6 +7,7 @@
 - Calendar heads-up ten minutes before each Google Calendar event.
 - System guardian: low battery, memory nearly exhausted, disk nearly full.
 - Exam countdown: a word a week, three days and one day before each exam, and on the day.
+- Bedtime (SEBAS_BEDTIME, default 23:30): music paused and a word on tomorrow, at the laptop only.
 - Wellbeing: break and posture nudges, water reminders, and 20-20-20 eye cues
   (custom_tools/wellbeing.py); spoken at the laptop only, never sent to Discord.
 - Standing orders (custom_tools/standing.py): the user's own timed routines, and
@@ -42,6 +43,7 @@ _PRESENT_IDLE_SECONDS = 120
 _CALENDAR_POLL_SECONDS = 300
 _HEADS_UP_MINUTES = 10
 _ANIME_POLL_SECONDS = 30 * 60
+_BEDTIME_AGAIN_SECONDS = 30 * 60
 _EXAM_WARNINGS = {
     7: "Sir, your {s} exam is a week away. A pomodoro or two each day would serve you well.",
     3: "Sir, three days until your {s} exam. Shall we review the flashcards?",
@@ -54,8 +56,9 @@ BRIEFING_PROMPT = (
     "use the morning_briefing tool, and include what is due on my agenda today."
 )
 EVENING_PROMPT = (
-    "[Scheduled evening check-in] Give me a brief wrap-up of today: agenda items done "
-    "and due tomorrow, and today's spending. Then ask me, in one sentence, how my day "
+    "[Scheduled evening check-in] Give me a brief wrap-up of today: use my_day and open with "
+    "two sentences on my day (focus time, tasks done, the apps I used most), then what is due "
+    "tomorrow and today's spending. Then ask me, in one sentence, how my day "
     "went. When I answer, save my answer with journal_add."
 )
 RECAP_PROMPT = (
@@ -177,7 +180,7 @@ class Scheduler:
         time.sleep(20)  # let Sebas finish starting up first
         while True:
             for job in (self._deadlines, self._calendar, self._guardian, self._routines, self._anime, self._exams,
-                        self._wellbeing, self._standing):
+                        self._wellbeing, self._standing, self._bedtime):
                 try:
                     job(datetime.now())
                 except Exception:
@@ -207,6 +210,33 @@ class Scheduler:
         elif evening_due and self._once("evening", today):
             weekly = now.weekday() == 6
             self._converse(RECAP_PROMPT if weekly else EVENING_PROMPT, True, "Weekly recap" if weekly else "Evening check-in")
+
+    def _bedtime(self, now: datetime) -> None:
+        """At bedtime, at the laptop: pause the music and say what tomorrow holds; once more
+        half an hour later if the user is still up (custom_tools/daylog.py)."""
+        from custom_tools import daylog
+        from custom_tools.study import focus_active
+
+        import sebas_calls
+
+        at = daylog.bedtime()
+        if at is None or not daylog.is_past_bedtime(now, at):
+            return
+        if idle_seconds() > _PRESENT_IDLE_SECONDS or focus_active() or sebas_calls.DESK.active():
+            return
+        night = daylog.night_of(now)
+        if self._state.get("bedtime") != night:
+            self._state["bedtime"], self._state["bedtime_at"] = night, now.timestamp()
+            self._save()
+            paused = _pause_music()
+            self._raw_say(f"It is {now.strftime('%I:%M').lstrip('0')}, sir, and past your bedtime. "
+                          + ("I have paused the music. " if paused else "") + daylog.tomorrow_line(now)
+                          + " Do rest when you are ready.")
+        elif (self._state.get("bedtime_again") != night
+              and now.timestamp() - self._state.get("bedtime_at", now.timestamp()) >= _BEDTIME_AGAIN_SECONDS):
+            self._state["bedtime_again"] = night
+            self._save()
+            self._raw_say("Still up, sir? Tomorrow will arrive whether or not you are rested for it. I do recommend bed.")
 
     def _standing(self, now: datetime) -> None:
         """Watchers ("tell me when...") and the user's own timed routines."""
@@ -309,6 +339,21 @@ class Scheduler:
         disk = psutil.disk_usage(os.environ.get("SystemDrive", "C:") + "\\")
         if disk.free < 10 * 2**30 and self._once("disk_warned", now.date().isoformat()):
             self._say(f"Sir, only {disk.free / 2**30:.0f} gigabytes remain free on the system drive.")
+
+
+def _pause_music() -> bool:
+    """Pause Spotify if it is playing; otherwise send the media Stop key, which pauses most
+    players and never starts one. True if Spotify was paused."""
+    try:
+        from custom_tools.media_system import press_media_key, spotify_now_playing
+
+        if spotify_now_playing():
+            press_media_key("play_pause")
+            return True
+        press_media_key("stop")
+    except Exception:
+        logger.debug("Could not pause the music", exc_info=True)
+    return False
 
 
 def evening_greeting(now: datetime | None = None) -> str:

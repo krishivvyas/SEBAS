@@ -236,7 +236,7 @@ class SebasApp:
             "study": study.snapshot(),
             "wellbeing": wellbeing.WELLBEING.status(),
             "errand": errands.snapshot(),
-            "standing": [row for row in (coding.snapshot(), browser.snapshot()) if row] + standing.snapshot()[:8],
+            "standing": [row for row in (coding.snapshot(), coding.review_snapshot(), browser.snapshot()) if row] + standing.snapshot()[:8],
             "call": _call_status(),
         }
 

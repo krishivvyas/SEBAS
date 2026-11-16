@@ -189,6 +189,12 @@ def start_calls(ears=None, mouth=None) -> None:
         browser.start_bridge()
     except Exception:
         logger.exception("Browser link unavailable")
+    try:  # the screen-time diary (custom_tools/screentime.py); a passed limit is said once
+        from custom_tools import laptop, screentime
+
+        screentime.start(lambda message: sebas_calls.DESK.hold_or_say(laptop._announce, message))
+    except Exception:
+        logger.exception("Screen-time diary unavailable")
 
 
 def load_voice():

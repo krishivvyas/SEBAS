@@ -125,6 +125,13 @@ A request that needs several steps becomes one errand: I plan it, work through i
 *How is the errand going?* · *stop the errand* · *save that as my evening wrap-up* · *run my evening wrap-up* · *what errands have I saved?*
 Steps that need thought go to Gemini, or to the laptop's own model when the errand would use more than a quarter of today's remaining Gemini quota (slower, but free). *Do it on the local model* / *use Gemini for this* overrides that.""",
 
+"""## Your day & search
+*What did I do today?* · screen time, focus, tasks done, spending, and what I did for you (also in the evening check-in)
+*How long was I on YouTube today?* · *my screen time this week* · *limit YouTube to an hour a day* (I mention it once when passed) · *remove the YouTube limit*
+*Bedtime at midnight* · *no bedtime reminder* · at bedtime, at the laptop, I pause the music and say what tomorrow holds
+*What did I note about normalisation?* · searches your lecture notes, Documents, journal and flashcards on the laptop
+*Have Claude review my open PR in sebas* · a read-only review; I read out the main findings and save the rest (asks for your **yes** from here)""",
+
 """## Messages (each asks for your **yes**)
 *Tell Rahul on WhatsApp I'll be ten minutes late* · *WhatsApp +91 98765 43210: the notes are in the drive*
 *Email Professor Mehta that I'll submit the report on Monday* · *post "meeting moved to 6" in #general*

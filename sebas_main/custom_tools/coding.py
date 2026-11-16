@@ -471,3 +471,197 @@ class DiscardCodingTool(SebasTool):
         _git(folder, "branch", "-D", job["branch"])
         job["state"] = "discarded"
         return f"Discarded. {job['project']} is back on {job['base']}, and the branch {job['branch']} is gone."
+
+
+# --------------------------------------------------------------------------- pull-request reviews
+# "Have Claude review my open PR in sebas": Claude Code reads the pull request's
+# changes, in the project's folder for context, with read-only tools (no Bash,
+# no editing), and Sebas reads out the main findings. The full review is saved
+# beside the coding reports. Nothing is posted to GitHub. A review may run while
+# a coding job runs, since it changes nothing.
+
+_MAX_DIFF = 120_000
+_review: dict[str, Any] | None = None
+_review_lock = threading.Lock()
+
+
+def github_repo(folder: Path) -> str:
+    """'owner/name' of the project's GitHub remote."""
+    url = _git(folder, "remote", "get-url", "origin", check=False)
+    found = re.search(r"github\.com[:/]([^/\s]+)/([^/\s]+?)(?:\.git)?/?$", url or "")
+    if not found:
+        raise ToolError("That project has no GitHub remote called origin, so there is no pull request to review.")
+    return f"{found.group(1)}/{found.group(2)}"
+
+
+def _github(path: str, accept: str = "application/vnd.github+json", **params: Any) -> Any:
+    import httpx
+
+    from custom_tools._base import require_env
+
+    token = require_env("GITHUB_PAT", "GitHub")
+    try:
+        response = httpx.get(f"https://api.github.com{path}", params=params, timeout=30, follow_redirects=True,
+                             headers={"Authorization": f"Bearer {token}", "Accept": accept,
+                                      "X-GitHub-Api-Version": "2022-11-28"})
+    except httpx.HTTPError as exc:
+        raise ToolError(f"Could not reach GitHub: {exc}") from exc
+    if response.status_code == 404:
+        raise ToolError("GitHub found no such pull request (or the token cannot see that repository).")
+    if response.status_code >= 400:
+        raise ToolError(f"GitHub returned HTTP {response.status_code}: {response.text[:200]}")
+    return response.text if "diff" in accept else response.json()
+
+
+def find_pr(repo: str, number: int | None) -> dict[str, Any]:
+    """The pull request to review: the one named, else the user's most recent open one in that
+    repository, else the most recent one awaiting his review."""
+    if number:
+        return _github(f"/repos/{repo}/pulls/{int(number)}")
+    login = _github("/user")["login"]
+    for query in (f"is:pr is:open repo:{repo} author:{login}", f"is:pr is:open repo:{repo} review-requested:{login}"):
+        items = _github("/search/issues", q=query, sort="updated", per_page=1).get("items", [])
+        if items:
+            return _github(f"/repos/{repo}/pulls/{items[0]['number']}")
+    raise ToolError(f"There is no open pull request of yours, or awaiting your review, in {repo}. Give its number.")
+
+
+def review_command() -> list[str] | None:
+    exe = shutil.which("claude")
+    if not exe:
+        return None
+    return [exe, "-p", "--permission-mode", "dontAsk", "--output-format", "json", "--setting-sources", "",
+            "--strict-mcp-config", "--tools", "Read,Glob,Grep", "--allowedTools", "Read,Glob,Grep"]
+
+
+def _review_brief(repo: str, pr: dict[str, Any], diff: str) -> str:
+    cut = len(diff) > _MAX_DIFF
+    return (
+        "You are reviewing a GitHub pull request for the user, unattended and read-only. The project's files are "
+        "in the current folder (possibly on a different branch from the pull request), for context.\n\n"
+        f"Repository: {repo}\nPull request #{pr['number']}: {pr.get('title', '')}\n"
+        f"From {pr.get('head', {}).get('ref', '?')} into {pr.get('base', {}).get('ref', '?')}\n\n"
+        f"Description:\n{(pr.get('body') or '(none)')[:3000]}\n\n"
+        f"The changes (unified diff{', cut short: it was too long' if cut else ''}):\n{diff[:_MAX_DIFF]}\n\n"
+        "Review it the way a careful senior engineer would: correctness bugs first, then security, then anything "
+        "likely to break, then clarity. For each finding give the file and line, what is wrong, and a fix. Skip "
+        "style nitpicks. If it looks good, say so plainly.\n\n"
+        "End with a line beginning 'SPOKEN:' and then two or three plain sentences for the user to hear: how many "
+        "real problems there are and the most important one, with no markdown and no file paths."
+    )
+
+
+def _finish_review(review: dict[str, Any], state: str, sentence: str, text: str = "") -> None:
+    review["state"], review["summary"], review["ended"] = state, sentence, time.time()
+    folder = get_data_dir() / "sebas" / "coding"
+    try:
+        folder.mkdir(parents=True, exist_ok=True)
+        path = folder / f"{datetime.now():%Y-%m-%d-%H%M}-review-{review['repo'].split('/')[-1]}-{review['number']}.md"
+        path.write_text(f"# Review of {review['repo']}#{review['number']}: {review['title']}\n\n{review['url']}\n\n"
+                        f"Outcome: {state}\n\n{text or sentence}\n", "utf-8")
+        review["report"] = str(path)
+    except OSError:
+        logger.exception("Could not save the review")
+    sebas_actions.log("review_pr", f"{review['repo']}#{review['number']}: {state}", ok=state == "done")
+    _tell(sentence)
+
+
+def _run_review(review: dict[str, Any], command: list[str], brief: str) -> None:
+    try:
+        proc = subprocess.Popen(command, cwd=review["folder"], stdin=subprocess.PIPE, stdout=subprocess.PIPE,
+                                stderr=subprocess.PIPE, text=True, encoding="utf-8", errors="replace",
+                                env=_child_env(), creationflags=_NO_WINDOW)
+        review["proc"] = proc
+        stdout, stderr = proc.communicate(brief, timeout=_minutes() * 60)
+    except subprocess.TimeoutExpired:
+        _kill(review["proc"])
+        return _finish_review(review, "timeout", f"Sir, Claude ran out of time reviewing pull request {review['number']}.")
+    except OSError as exc:
+        return _finish_review(review, "failed", f"Sir, Claude Code could not start for the review ({exc}).")
+    if review["state"] != "running":
+        return
+    ok, reply = _read_result(stdout)
+    if proc.returncode != 0 or not ok or not reply:
+        reason = " ".join((reply or stderr or "no explanation").split())[:200]
+        return _finish_review(review, "failed", f"Sir, Claude could not review pull request {review['number']}: {reason}")
+    _finish_review(review, "done", f"Sir, Claude has reviewed pull request {review['number']}, {review['title'][:80]}. "
+                   f"{_spoken(reply)} The full review is saved with the coding reports.", reply)
+
+
+def start_review(project: str, number: int | None = None) -> dict[str, Any]:
+    global _review
+    folder = Path(str(_lookup("projects", project))).expanduser()
+    if not folder.is_dir():
+        raise ToolError(f"The folder for {project} does not exist: {folder}")
+    command = review_command()
+    if command is None:
+        raise ToolError("Claude Code is not installed, so there is no one to review it.")
+    with _review_lock:
+        if _review is not None and _review["state"] == "running":
+            raise ToolError(f"Claude is still reviewing pull request {_review['number']}. One review at a time.")
+        repo = github_repo(folder)
+        pr = find_pr(repo, number)
+        diff = _github(f"/repos/{repo}/pulls/{pr['number']}", accept="application/vnd.github.diff")
+        if not diff.strip():
+            raise ToolError(f"Pull request {pr['number']} has no changes to review.")
+        _review = review = {"project": project, "folder": folder, "repo": repo, "number": pr["number"],
+                            "title": pr.get("title", ""), "url": pr.get("html_url", ""), "state": "running",
+                            "started": time.time(), "summary": "", "files": pr.get("changed_files", 0)}
+    review["thread"] = threading.Thread(target=_guarded_review, args=(review, command, _review_brief(repo, pr, diff)),
+                                        name="sebas-review", daemon=True)
+    review["thread"].start()
+    return review
+
+
+def _guarded_review(review: dict[str, Any], command: list[str], brief: str) -> None:
+    try:
+        _run_review(review, command, brief)
+    except Exception as exc:
+        logger.exception("The review failed")
+        if review["state"] == "running":
+            _finish_review(review, "failed", f"Sir, the review failed unexpectedly: {type(exc).__name__}.")
+
+
+def review_snapshot() -> dict[str, str] | None:
+    r = _review
+    if r is None or r["state"] != "running":
+        return None
+    return {"label": f"Claude · reviewing #{r['number']} {r['title'][:50]}",
+            "detail": f"reviewing · {int((time.time() - r['started']) / 60)} min"}
+
+
+@ToolRegistry.register("review_pr")
+class ReviewPrTool(SebasTool):
+    name = "review_pr"
+    acts_on_laptop = True
+    timeout_seconds = 90.0
+    description = (
+        "Have Claude Code review a GitHub pull request in one of the user's projects, read-only: 'have Claude "
+        "review my open PR in sebas'. Without a number it takes his most recent open pull request in that "
+        "repository. Runs in the background; the main findings are read out when it is done and the full review "
+        "is saved. Nothing is posted to GitHub. Action 'status' reports on the current or last review."
+    )
+
+    def parameter_schema(self) -> dict[str, Any]:
+        return {
+            "type": "object",
+            "properties": {
+                "project": _choice_param("projects", "Which project."),
+                "number": {"type": "integer", "description": "The pull request number, if the user gave one."},
+                "action": {"type": "string", "enum": ["start", "status"], "description": "Default start."},
+            },
+        }
+
+    def run(self, project: str = "", number: int | None = None, action: str = "start") -> str:
+        if action == "status":
+            r = _review
+            if r is None:
+                return "No review has been started since Sebas was last opened."
+            if r["state"] == "running":
+                return f"Claude is still reviewing pull request {r['number']} ({r['title']}), for {(time.time() - r['started']) / 60:.0f} minutes."
+            return f"The last review, of pull request {r['number']} ({r['title']}), ended as: {r['state']}. {r['summary']} Saved at {r.get('report', 'nowhere')}."
+        if not project:
+            raise ToolError("Which project? Ask the user.")
+        r = start_review(project, number)
+        return (f"Claude is reviewing pull request {r['number']} in {r['repo']}, '{r['title']}' "
+                f"({r['files']} files changed), in the background. The user will hear the main findings when it is done.")

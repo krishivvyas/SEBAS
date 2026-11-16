@@ -52,6 +52,23 @@ def log(action: str, detail: str, ok: bool = True) -> None:
         logger.debug("Could not write the action log", exc_info=True)
 
 
+def on_day(day: str) -> list[dict[str, Any]]:
+    """Every action logged on one day ('YYYY-MM-DD')."""
+    try:
+        lines = _log_path().read_text("utf-8").splitlines()
+    except OSError:
+        return []
+    found = []
+    for line in lines:
+        if not line.startswith('{"at": "' + day):
+            continue
+        try:
+            found.append(json.loads(line))
+        except json.JSONDecodeError:
+            continue
+    return found
+
+
 def recent(limit: int = 20) -> list[dict[str, Any]]:
     try:
         lines = _log_path().read_text("utf-8").splitlines()[-limit:]

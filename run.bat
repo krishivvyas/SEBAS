@@ -16,6 +16,8 @@ rem Standing orders: "Sebas, tell me when the deploy finishes" / "...when the do
 rem   "every weekday at 9, open my workspace"; "what are you watching for?"; "cancel the Steam watch".
 rem Errands: "Sebas, set up my week: add these tasks, log this expense, then read me my agenda" (a background checklist);
 rem   "save that as my evening wrap-up"; "run my evening wrap-up". Big errands late in the day think on the local model.
+rem Your day: "what did I do today?"; "how long was I on YouTube?"; "limit YouTube to an hour a day"; bedtime at SEBAS_BEDTIME (23:30).
+rem Search: "what did I note about normalisation?" (notes, Documents, journal, flashcards). Reviews: "have Claude review my open PR in sebas".
 rem Messages: "Sebas, tell Rahul on WhatsApp I'll be late"; "email Professor Mehta that..."; "post ... in #general".
 rem   He reads back the recipient and the words and sends only on your yes. Names come from [contacts] in laptop.toml.
 rem Browser: "Sebas, go to the college portal and tell me if the timetable is out" (works in a new tab of your own Edge).
