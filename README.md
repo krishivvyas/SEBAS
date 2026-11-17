@@ -71,6 +71,8 @@ flowchart TD
 
 ## ✨ Key Features
 
+> A one-page list of every feature, what to say, and which ones use Gemini: **[FEATURES.md](FEATURES.md)**.
+
 - **Wakes on his name**, with no "Hey Jarvis":
   - *"Sebas, rise."* → he answers *"At your service."* and listens for your request.
   - *"Sebas, open YouTube."* → the request is handled in one breath.
@@ -184,6 +186,7 @@ flowchart TD
 ```text
 sebas/
 ├── README.md
+├── FEATURES.md                      # Every feature, what to say, and which use Gemini
 ├── run.bat                          # One-click Windows launcher
 └── sebas_main/                      # OpenJarvis framework + Sebas
     ├── run_sebas.py                 # Entry point: interface, voice and text modes
