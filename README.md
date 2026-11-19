@@ -925,7 +925,7 @@ Every commit gets a version, and each version is tagged in git (`git checkout v1
 
 | Version | Date | Commit | What changed |
 |---|---|---|---|
-| **v1.10.2** | 2026-11-19 | *this one* | README reformatted for reading (collapsible sections, tables, contents list); version history added here and in FEATURES.md |
+| **v1.10.2** | 2026-11-19 | *this one* | README reformatted for reading (collapsible sections, tables, contents list); version history added here and in FEATURES.md; the missing `LICENSE` file added (MIT for Sebas, Apache 2.0 noted for OpenJarvis) |
 | v1.10.1 | 2026-11-17 | `ac40977` | **FEATURES.md**: every feature on one page, what to say, and which ones use Gemini |
 | **v1.10.0** | 2026-11-16 | `0353d89` | **Your day**: screen-time diary and limits, "what did I do today?", bedtime wind-down. **Search my stuff**. **Claude reviews your pull requests** |
 | **v1.9.0** | 2026-11-16 | `6646cf8` | **Messages** (WhatsApp, Gmail compose, Discord channel, always behind a yes). **Browser hands** with the Sebas browser extension |
@@ -947,4 +947,7 @@ Every commit gets a version, and each version is tagged in git (`git checkout v1
 
 ## 📜 License
 
-This project is licensed under the MIT License; see the [LICENSE](LICENSE) file for details.
+| Part | License |
+|---|---|
+| Sebas's own code and docs | MIT, see [LICENSE](LICENSE) |
+| The OpenJarvis framework in `sebas_main/` | Apache 2.0, see [sebas_main/LICENSE](sebas_main/LICENSE) |
