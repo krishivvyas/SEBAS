@@ -168,6 +168,30 @@ These are recognised on the laptop and answered instantly, with no Gemini reques
 
 ---
 
+## Which version added what
+
+Current version: **v1.10.2**. The full history, with commits, is in the [README](README.md#️-version-history).
+
+| Version | Features added |
+|---|---|
+| v1.10.2 | README reformatted; this version list |
+| v1.10.1 | This file (FEATURES.md) |
+| v1.10.0 | Screen-time diary and limits, what did I do today, bedtime wind-down, search my stuff, PR review |
+| v1.9.0 | Messages (WhatsApp, email, Discord channel), browser hands |
+| v1.8.0 | Errands |
+| v1.7.0 | Standing orders and watches, coding delegate, file hands, desk hands, the yes-gate |
+| v1.6.1 | Call audio (clean mode) |
+| v1.6.0 | Sebas on your calls, voice on Discord |
+| v1.5.1 | Agenda fixes (duplicates, mark everything done) |
+| v1.5.0 | Study mode, wellbeing butler, Games Room, web search |
+| v1.4.0 | Gemini brain, Discord bot, proactive butler, agenda/expenses/journal, music and system settings, screen and clipboard, Downloads tidy, read aloud, lecture notes, AniList, Easter eggs |
+| v1.3.0 | Desktop interface, conversation follow-up |
+| v1.2.0 | Local model and offline mode |
+| v1.1.0 | Voice pipeline (wake on name, listening, speaking), DevOps, GitHub, Steam, Bookswagon, morning briefing, laptop actions, memory |
+| v1.0.0 | First commit |
+
+---
+
 ## Not built yet
 
 | Idea | Status |
