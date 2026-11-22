@@ -331,6 +331,12 @@ body[data-state="listening"] .state-caption { color: var(--holo); }
 .mind { display: grid; grid-template-columns: auto 1fr; gap: 6px 14px; font-family: var(--mono); font-size: 11px; letter-spacing: 0.06em; }
 .mind dt { color: var(--ivory-dim); text-transform: uppercase; letter-spacing: 0.16em; font-size: 9.5px; padding-top: 2px; }
 .mind dd { margin: 0; color: var(--ivory); }
+.ear { display: grid; grid-template-columns: auto 1fr; align-items: center; gap: 10px; margin: 2px 0 4px; }
+.ear-label { display: flex; align-items: center; gap: 6px; font-family: var(--display); font-size: 9.5px; letter-spacing: 0.2em; text-transform: uppercase; color: var(--brass); }
+.ear-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--ivory-dim); opacity: 0.5; }
+.ear .meter { margin-top: 0; }
+body[data-state="listening"] .ear-label { color: var(--holo); }
+body[data-state="listening"] .ear-dot { background: var(--holo); opacity: 1; box-shadow: 0 0 6px var(--holo); animation: call-pulse 1.2s infinite; }
 .meter { height: 6px; background: rgba(95, 227, 214, 0.08); border: 1px solid var(--holo-dim); position: relative; overflow: hidden; margin-top: 3px; }
 .meter i { position: absolute; inset: 0 auto 0 0; width: 0; background: linear-gradient(90deg, var(--holo), #b6fff6); box-shadow: 0 0 8px var(--holo); transition: width 0.08s linear; }
 
@@ -609,7 +615,13 @@ canvas.snake { display: block; margin: 0 auto; border: 1px solid var(--line); wi
 #call.ask { animation: call-ask .7s steps(6) 2; }
 @keyframes call-ask { 50% { border-color: var(--brass-hi); box-shadow: 0 0 0 2px var(--brass), 0 10px 34px rgba(0, 0, 0, 0.5); } }
 .call-actions .game-btn { white-space: nowrap; }
-#call { width: min(410px, 48%); }
-.call-warn { margin: 0; font-size: 12.5px; line-height: 1.35; color: var(--ruby); }
+/* Keep everything inside the panel: one column that may shrink, rows that wrap. */
+#call { width: min(410px, calc(100% - 28px)); max-height: calc(100% - 28px); overflow-y: auto; grid-template-columns: minmax(0, 1fr); box-sizing: border-box; }
+#call > * { min-width: 0; }
+.call-actions, #call-as { flex-wrap: wrap; }
+.call-head b { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+#call-route { white-space: nowrap; }
+.call-warn { margin: 0; font-size: 12.5px; line-height: 1.35; color: var(--ruby); overflow-wrap: anywhere; }
+.call-hint { overflow-wrap: anywhere; }
 .call-warn[hidden] { display: none; }
 .call-link { background: none; border: 0; padding: 0; color: var(--brass-hi); font: inherit; text-decoration: underline; cursor: pointer; }

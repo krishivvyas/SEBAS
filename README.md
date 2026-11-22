@@ -31,7 +31,7 @@
 - [Status](#-status)
 - [Version History](#-version-history)
 
-**Current version: v1.10.2**
+**Current version: v1.10.4**
 
 ---
 
@@ -482,6 +482,11 @@ Works with WhatsApp Desktop, Instagram or Meet in the browser, Discord, and phon
 
 **Choose the cable only while Sebas is running**, or the caller hears nothing. Without it he falls back to **speaker mode** (through the speakers) and warns you that the caller may not hear him.
 
+**Still says "speaker" with VB-Cable installed?** If the log (`~/.openjarvis/sebas/logs/sebas.log`) shows `VB-Cable found but could not be opened (RuntimeError: Error 0x8889000a)`, another program is holding the cable. Newer VB-Cable versions add a second playback device, **CABLE In 16ch**, which is the same cable as **CABLE Input**, and audio enhancers such as **FxSound** latch onto it.
+1. Press **Win+R**, type `mmsys.cpl`; on the **Playback** tab right-click **CABLE In 16ch** → **Disable**.
+2. Quit FxSound (or any other audio enhancer) from the system tray, and turn off its *start with Windows* option, or it will take the cable again after a restart.
+3. Restart Sebas and say *"Sebas, test call audio"*. The panel should show **clean**.
+
 **Your name:** set `SEBAS_MASTER_NAME` in `.env` so he can say whose assistant he is. With several names (`Krishiv, Hermit`) he asks *"Krishiv or Hermit, sir?"* when you hand him a call (skip it with *"take this call as Hermit"*); the panel shows a button for each, and Ctrl+Alt+C uses the one picked last.
 </details>
 
@@ -925,7 +930,9 @@ Every commit gets a version, and each version is tagged in git (`git checkout v1
 
 | Version | Date | Commit | What changed |
 |---|---|---|---|
-| **v1.10.2** | 2026-11-19 | *this one* | README reformatted for reading (collapsible sections, tables, contents list); version history added here and in FEATURES.md; the missing `LICENSE` file added (MIT for Sebas, Apache 2.0 noted for OpenJarvis) |
+| v1.10.4 | 2026-11-22 | *next* | Interface: the Calls panel keeps its text and buttons inside the frame (wraps instead of cutting off); the Ear (microphone) meter moved up under the Battery/Engine/Memory gauges and glows while Sebas listens; README: troubleshooting for calls stuck in speaker mode (VB-Cable "CABLE In 16ch" and FxSound) |
+| v1.10.3 | 2026-11-19 | `a6fb0fe` | The missing `LICENSE` file added (MIT for Sebas; OpenJarvis in `sebas_main/` stays Apache 2.0) |
+| v1.10.2 | 2026-11-19 | `7415971` | README reformatted for reading (collapsible sections, tables, contents list); version history added here and in FEATURES.md |
 | v1.10.1 | 2026-11-17 | `ac40977` | **FEATURES.md**: every feature on one page, what to say, and which ones use Gemini |
 | **v1.10.0** | 2026-11-16 | `0353d89` | **Your day**: screen-time diary and limits, "what did I do today?", bedtime wind-down. **Search my stuff**. **Claude reviews your pull requests** |
 | **v1.9.0** | 2026-11-16 | `6646cf8` | **Messages** (WhatsApp, Gmail compose, Discord channel, always behind a yes). **Browser hands** with the Sebas browser extension |

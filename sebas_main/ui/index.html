@@ -105,7 +105,7 @@
     <div id="call" aria-live="polite" data-state="off">
       <div class="call-head"><span class="call-dot"></span><b id="call-title">Calls</b><span id="call-route">speaker</span><button id="call-close" class="call-x" title="Hide">×</button></div>
       <ol id="call-lines"></ol>
-      <form id="call-relay"><input id="call-relay-text" placeholder="Tell them… (they won't hear you type)" maxlength="300" autocomplete="off"><button class="game-btn">Pass on</button></form>
+      <form id="call-relay"><input id="call-relay-text" placeholder="Tell them… (silently)" title="Sebas says this to the caller; they won't hear you type" maxlength="300" autocomplete="off"><button class="game-btn">Pass on</button></form>
       <div class="call-actions"><span id="call-as" hidden></span><button id="call-take" class="game-btn">Take the call</button><button id="call-captions" class="game-btn">Captions</button></div>
       <p class="call-warn" id="call-warn" hidden>Speaker mode: callers may not hear me (call apps filter out laptop sound). <button id="call-test" class="call-link">Set up clean mode</button></p>
       <p class="call-hint">Answer the call yourself first · Ctrl+Alt+C takes it or hands it back</p>
@@ -340,6 +340,7 @@
     <h2 class="panel-title"><span>The Household</span></h2>
     <div class="body">
       <div class="dials" id="dials"></div>
+      <div class="ear" title="Microphone level"><span class="ear-label"><i class="ear-dot"></i>Ear</span><div class="meter"><i id="mic-meter"></i></div></div>
 
       <h3 class="sub">The Agenda</h3>
       <ul class="list" id="agenda"><li class="empty">The agenda is clear.</li></ul>
@@ -371,7 +372,6 @@
       <dl class="mind">
         <dt>Engine</dt><dd id="mind-engine">—</dd>
         <dt>Last reply</dt><dd id="mind-latency">—</dd>
-        <dt>Ear</dt><dd><div class="meter"><i id="mic-meter"></i></div></dd>
       </dl>
     </div>
   </section>

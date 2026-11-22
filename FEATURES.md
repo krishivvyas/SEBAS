@@ -170,10 +170,12 @@ These are recognised on the laptop and answered instantly, with no Gemini reques
 
 ## Which version added what
 
-Current version: **v1.10.2**. The full history, with commits, is in the [README](README.md#️-version-history).
+Current version: **v1.10.4**. The full history, with commits, is in the [README](README.md#️-version-history).
 
 | Version | Features added |
 |---|---|
+| v1.10.4 | Calls panel layout fixed; Ear meter moved under the gauges; speaker-mode troubleshooting in the README |
+| v1.10.3 | LICENSE file (MIT) |
 | v1.10.2 | README reformatted; this version list |
 | v1.10.1 | This file (FEATURES.md) |
 | v1.10.0 | Screen-time diary and limits, what did I do today, bedtime wind-down, search my stuff, PR review |
