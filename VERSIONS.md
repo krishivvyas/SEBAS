@@ -6,7 +6,7 @@ Every version of Sebas, newest first. **v1.N.0** adds features; **v1.N.x** is do
 
 ---
 
-### v1.11.2 · 2026-11-22 · *not yet committed*
+### v1.11.2 · 2026-11-22 · `c2617a8`
 - This file (VERSIONS.md): every version with what it added, linked from README and FEATURES.md.
 
 ### v1.11.1 · 2026-11-22 · `c51f820`
