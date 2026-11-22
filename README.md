@@ -31,7 +31,7 @@
 - [Status](#-status)
 - [Version History](#-version-history)
 
-**Current version: v1.11.1**
+**Current version: v1.11.2**
 
 ---
 
@@ -608,6 +608,7 @@ The order: **Gemini key 1 → Gemini key 2 → a local model.**
 sebas/
 ├── README.md
 ├── FEATURES.md                      # Every feature, what to say, and which use Gemini
+├── VERSIONS.md                      # Every version and what it added
 ├── run.bat                          # One-click Windows launcher
 └── sebas_main/                      # OpenJarvis framework + Sebas
     ├── run_sebas.py                 # Entry point: interface, voice and text modes
@@ -972,6 +973,8 @@ At startup OpenJarvis logs that its optional Rust extension (`openjarvis_rust`) 
 
 ## 🏷️ Version History
 
+A short list of every version is in **[VERSIONS.md](VERSIONS.md)**.
+
 Every commit gets a version, and each version is tagged in git (`git checkout v1.7.0` goes back to it).
 
 - **v1.N.0**: new features.
@@ -979,7 +982,8 @@ Every commit gets a version, and each version is tagged in git (`git checkout v1
 
 | Version | Date | Commit | What changed |
 |---|---|---|---|
-| v1.11.1 | 2026-11-22 | *next* | Documentation brought up to date: architecture diagram, RAM figures, the 213 tests, live test results (calls clean mode, languages), folder layout, `run.bat` notes |
+| v1.11.2 | 2026-11-22 | *next* | **VERSIONS.md**: every version with what it added in a few bullets |
+| v1.11.1 | 2026-11-22 | `c51f820` | Documentation brought up to date: architecture diagram, RAM figures, the 213 tests, live test results (calls clean mode, languages), folder layout, `run.bat` notes |
 | **v1.11.0** | 2026-11-22 | `f3315e5` | **English, Hindi and Gujarati**: language detected per sentence (tiny, then small for Hindi/Gujarati, loaded only when needed and released after 10 idle minutes), replies in your language, Sebas says when he switches; Hindi voice (Kokoro `hm_omega`) and a native Gujarati voice (MMS); Hindi/Gujarati yes and no. **Listening fixes**: 1.2 s pause allowed, 25 s requests, misheard "rise" understood, contacts/projects in the vocabulary, timing in the log |
 | v1.10.4 | 2026-11-22 | `72eda40` | Interface: the Calls panel keeps its text and buttons inside the frame (wraps instead of cutting off); the Ear (microphone) meter moved up under the Battery/Engine/Memory gauges and glows while Sebas listens; README: troubleshooting for calls stuck in speaker mode (VB-Cable "CABLE In 16ch" and FxSound) |
 | v1.10.3 | 2026-11-19 | `a6fb0fe` | The missing `LICENSE` file added (MIT for Sebas; OpenJarvis in `sebas_main/` stays Apache 2.0) |
