@@ -31,7 +31,7 @@
 - [Status](#-status)
 - [Version History](#-version-history)
 
-**Current version: v1.10.4**
+**Current version: v1.11.0**
 
 ---
 
@@ -109,6 +109,40 @@ Click any ▶ line to expand the details.
 - **Web search**: *"Sebas, who won the last F1 race?"* searches DuckDuckGo (no key needed) and, when a snippet isn't enough, opens the best result and reads it.
 - **"Sebas, sleep"** (or *"good night"*, *"that will be all"*): a time-appropriate farewell, then he shuts down.
 - **Butler persona**: formal, concise, no emojis or "As an AI...", and calm reports when something fails.
+
+### 🇮🇳 English, Hindi and Gujarati
+
+> *"सेबास, आज मेरा एजेंडा क्या है?"* · *"સેબાસ, આજે મારા કામ શું છે?"* · *"Sebas, what's on my agenda?"*
+
+- **Speak any of the three**; he detects which, per sentence, and **replies in the same language and script** (Hinglish in Latin letters gets English).
+- **He says when he switches**: *"भाषा बदलकर हिंदी कर रहा हूँ, साहब।"*, *"ભાષા બદલીને ગુજરાતી કરી રહ્યો છું, સાહેબ."*, *"Switching back to English, sir."*
+- **His voice per language**: English `bm_george`; Hindi Kokoro's `hm_omega`; Gujarati Meta's native MMS Gujarati voice. Each sentence is voiced by its script, so a Hindi reply with "GitHub" in it still sounds right.
+- **Yes and no in all three** for risky actions: *हाँ / हां जी / ठीक है / હા / બરાબર*, *नहीं / रहने दो / ના / નહીં*.
+- Also for **callers on a call** (he answers in their language) and **Discord voice notes**.
+
+<details>
+<summary><b>How it stays light</b>: Hindi/Gujarati models load only when you use them</summary>
+
+| Step | Model | Loaded |
+|---|---|---|
+| Which language? | Whisper `tiny` (~0.3 s) | Always |
+| "Hindi"? Check it isn't Gujarati | Whisper `small` | Only after Hindi or Gujarati is first heard |
+| Read English | Whisper `small.en`, with Sebas's vocabulary | Always |
+| Read Hindi / Gujarati | Whisper `small`, told the language | Only after Hindi or Gujarati is first heard |
+| Speak Gujarati | MMS Gujarati (ONNX, 114 MB) | Only when a Gujarati sentence is spoken |
+
+- After **10 minutes** without Hindi or Gujarati (`SEBAS_LANGUAGE_IDLE_MINUTES`), the Hindi/Gujarati speech model and the Gujarati voice are let go again. Measured: about +330 MB while in use, back to the English-only footprint afterwards.
+- Whisper writes Gujarati speech in Devanagari letters; Sebas converts it back to Gujarati script, letter for letter.
+- **Why not a bigger model:** `large-v3-turbo` was measured at 15–19 s a sentence on this laptop's (busy) CPU, `medium` at 12 s; this mix takes about 2–3 s for English and 4–6 s for Hindi or Gujarati.
+- **Limits:** Gujarati is the hardest of the three for Whisper (in testing it was sometimes first taken for Hindi; the second check by `small` catches most of these). The offline local model (`qwen2.5`) is weak at Gujarati and may answer in English. Lecture notes, Easter eggs and games stay English.
+- **Licence:** the MMS Gujarati voice is CC BY-NC 4.0 (non-commercial). `SEBAS_GUJARATI_VOICE=kokoro` reads Gujarati with the Hindi voice instead.
+</details>
+
+### 👂 Listening fixes (v1.11.0)
+
+- **No more cutting you off**: a pause of up to **1.2 s** (was 0.72 s) no longer ends the sentence (`SEBAS_PAUSE_SECONDS`), and a request may run **25 s** (was 15; `SEBAS_MAX_SPEECH_SECONDS`).
+- **Fewer wrong words**: the vocabulary hint now includes your contacts and project names; *"Sebas, Horizon"*, *"Nice"*, *"Raise"* (all heard in the log for *"rise"*) and *"Sebers"* are understood.
+- **Timing in the log** for every request: transcription, the reply, and the first words spoken, so slowness can be traced to the right part (Gemini's "busy" retries were a large share in recent logs).
 
 ### 📅 Daily life
 
@@ -495,8 +529,8 @@ Works with WhatsApp Desktop, Instagram or Meet in the browser, Discord, and phon
 <details>
 <summary><b>Local voice pipeline</b></summary>
 
-- `faster-whisper` for listening: `tiny.en` checks only the first 3 seconds of speech for the name, `small.en` reads requests, `int8` on CPU.
-- `Kokoro` for speaking (`bm_george`) through ONNX Runtime rather than PyTorch.
+- `faster-whisper` for listening: `tiny.en` checks only the first 3 seconds of speech for the name; `tiny` picks the language; `small.en` reads English requests and `small` Hindi and Gujarati (loaded only when needed); `int8` on CPU, 4 threads.
+- `Kokoro` for speaking (`bm_george`, and `hm_omega` for Hindi) through ONNX Runtime rather than PyTorch; Meta's MMS Gujarati voice through ONNX Runtime too.
 - Synthesis runs a sentence ahead of playback, so replies flow without pauses.
 </details>
 
@@ -685,7 +719,12 @@ Then fill in `.env`. **Nothing is strictly required**: without `GEMINI_API_KEY` 
 | `SEBAS_PROACTIVE` | Proactive butler | `off` disables briefings, check-ins and alerts |
 | `ANILIST_TOKEN` / `ANILIST_USER` | Anime | Token to read and update your list; or just a username for read-only |
 | `DISCORD_BOT_TOKEN` | Discord | The bot's token. He answers only the server's owner; set `DISCORD_USER_ID` (a numeric ID) to choose someone else, and `DISCORD_GUILD_ID` only if the bot is in several servers |
-| `SEBAS_NAME_MODEL`, `SEBAS_WHISPER_MODEL` | Listening | Defaults `tiny.en` and `small.en` |
+| `SEBAS_NAME_MODEL`, `SEBAS_WHISPER_MODEL` | Listening | Defaults `tiny.en` and `mix` (tiny detects the language, small.en for English, small for Hindi and Gujarati); or name one model |
+| `SEBAS_WHISPER_THREADS` | Listening | CPU threads for Whisper (default 4; more was slower on this laptop) |
+| `SEBAS_PAUSE_SECONDS`, `SEBAS_MAX_SPEECH_SECONDS` | Listening | Pause that ends a sentence (default 1.2) and the longest request (default 25) |
+| `SEBAS_LANGUAGE_IDLE_MINUTES` | Hindi, Gujarati | Unload their speech model and the Gujarati voice after this many minutes without them (default 10) |
+| `SEBAS_HINDI_VOICE` | Hindi speech | `hm_omega` (default), `hm_psi`, `hf_alpha`, `hf_beta` |
+| `SEBAS_GUJARATI_VOICE` | Gujarati speech | MMS Gujarati (default), or `kokoro` for the Hindi voice |
 </details>
 
 ### Optional setup
@@ -930,7 +969,8 @@ Every commit gets a version, and each version is tagged in git (`git checkout v1
 
 | Version | Date | Commit | What changed |
 |---|---|---|---|
-| v1.10.4 | 2026-11-22 | *next* | Interface: the Calls panel keeps its text and buttons inside the frame (wraps instead of cutting off); the Ear (microphone) meter moved up under the Battery/Engine/Memory gauges and glows while Sebas listens; README: troubleshooting for calls stuck in speaker mode (VB-Cable "CABLE In 16ch" and FxSound) |
+| **v1.11.0** | 2026-11-22 | *next* | **English, Hindi and Gujarati**: language detected per sentence (tiny, then small for Hindi/Gujarati, loaded only when needed and released after 10 idle minutes), replies in your language, Sebas says when he switches; Hindi voice (Kokoro `hm_omega`) and a native Gujarati voice (MMS); Hindi/Gujarati yes and no. **Listening fixes**: 1.2 s pause allowed, 25 s requests, misheard "rise" understood, contacts/projects in the vocabulary, timing in the log |
+| v1.10.4 | 2026-11-22 | `72eda40` | Interface: the Calls panel keeps its text and buttons inside the frame (wraps instead of cutting off); the Ear (microphone) meter moved up under the Battery/Engine/Memory gauges and glows while Sebas listens; README: troubleshooting for calls stuck in speaker mode (VB-Cable "CABLE In 16ch" and FxSound) |
 | v1.10.3 | 2026-11-19 | `a6fb0fe` | The missing `LICENSE` file added (MIT for Sebas; OpenJarvis in `sebas_main/` stays Apache 2.0) |
 | v1.10.2 | 2026-11-19 | `7415971` | README reformatted for reading (collapsible sections, tables, contents list); version history added here and in FEATURES.md |
 | v1.10.1 | 2026-11-17 | `ac40977` | **FEATURES.md**: every feature on one page, what to say, and which ones use Gemini |

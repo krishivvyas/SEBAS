@@ -25,6 +25,15 @@ Any request you speak goes through 🧠, except the ones in [Answered on the lap
 | Long-term memory | *"Remember that I prefer metric units"*, *"forget that"* | 🧠 |
 | Web search | *"Who won the last F1 race?"* | 🧠 |
 
+## Languages
+
+| Feature | Say | Model |
+|---|---|---|
+| Speak Hindi or Gujarati | *"सेबास, आज मेरा एजेंडा क्या है?"*, *"સેબાસ, આજે મારા કામ શું છે?"* | ⚙️ to detect the language (local Whisper); 🧠 for the reply, in the same language |
+| Language switch notice | Automatic: *"Switching back to English, sir."* | ⚙️ |
+| Hindi and Gujarati voices | Automatic, per sentence | ⚙️ (Kokoro Hindi, MMS Gujarati, on the laptop) |
+| Yes / no in Hindi and Gujarati | *"हाँ"*, *"ठीक है"*, *"હા"*, *"नहीं"*, *"ના"* | ⚙️ |
+
 ## Daily life
 
 | Feature | Say | Model |
@@ -170,10 +179,11 @@ These are recognised on the laptop and answered instantly, with no Gemini reques
 
 ## Which version added what
 
-Current version: **v1.10.4**. The full history, with commits, is in the [README](README.md#️-version-history).
+Current version: **v1.11.0**. The full history, with commits, is in the [README](README.md#️-version-history).
 
 | Version | Features added |
 |---|---|
+| v1.11.0 | English, Hindi and Gujarati (detected per sentence, replies and voices in each, models loaded only when used); listening fixes (longer pauses, misheard "rise", timing in the log) |
 | v1.10.4 | Calls panel layout fixed; Ear meter moved under the gauges; speaker-mode troubleshooting in the README |
 | v1.10.3 | LICENSE file (MIT) |
 | v1.10.2 | README reformatted; this version list |

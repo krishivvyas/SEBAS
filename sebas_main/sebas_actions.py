@@ -31,6 +31,15 @@ _YES = {"yes", "yeah", "yep", "yes please", "yes do it", "confirm", "confirmed",
         "proceed", "please do", "sure", "yes go ahead", "yes sebas", "affirmative"}
 _NO = {"no", "nope", "cancel", "cancel it", "never mind", "nevermind", "don't", "do not", "stop",
        "no thank you", "no thanks", "leave it", "no sebas"}
+# Hindi and Gujarati, as the speech model writes them (in their own script or
+# in Latin letters). Kept to unmistakable words: an unclear answer is dropped,
+# never taken as a yes.
+_YES |= {"haan", "han", "haa", "haan ji", "ji haan", "haanji", "theek hai", "thik hai", "kar do", "haan kar do",
+         "हाँ", "हां", "हा", "हाँ जी", "हां जी", "जी हाँ", "जी हां", "ठीक है", "कर दो", "हाँ कर दो", "हां कर दो",
+         "હા", "હાં", "હા જી", "જી હા", "બરાબર", "કરી દો", "હા કરી દો", "ઠીક છે"}
+_NO |= {"nahi", "nahin", "nahi nahi", "mat karo", "rehne do", "rahne do",
+        "नहीं", "नही", "ना", "नहीं नहीं", "मत करो", "रहने दो", "नहीं रहने दो",
+        "ના", "નહીં", "નહિ", "ના ના", "રહેવા દો", "ના રહેવા દો", "નથી કરવું"}
 
 _lock = threading.Lock()
 _pending: dict[str, Any] | None = None
@@ -106,7 +115,9 @@ def pending_summary() -> str:
 
 
 def _normalise(text: str) -> str:
-    return " ".join(re.sub(r"[^a-z' ]", " ", text.lower()).split())
+    # Latin, Devanagari and Gujarati letters with their vowel signs; the danda (।)
+    # and punctuation go, so "हाँ।" is a yes like "yes."
+    return " ".join(re.sub(r"[^a-z' ऀ-ॣ०-ॿ઀-ૣ૦-૿]", " ", text.lower()).split())
 
 
 def answer(text: str) -> str | None:

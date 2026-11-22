@@ -14,6 +14,7 @@ import os
 import queue
 import re
 import threading
+import time
 from pathlib import Path
 
 import numpy as np
@@ -89,7 +90,48 @@ def clean_for_speech(text: str) -> str:
 
 
 def split_sentences(text: str) -> list[str]:
-    return [part for part in re.split(r"(?<=[.!?;:])\s+", text) if part]
+    # "।" and "॥" end sentences in Hindi (Gujarati uses the full stop)
+    parts = re.split(r"(?<=[.!?;:।॥])\s+|(?<=[।॥])(?=\S)", text)
+    return [part.strip() for part in parts if part and part.strip()]
+
+
+_DEVANAGARI = re.compile(r"[ऀ-ॿ]")
+_GUJARATI = re.compile(r"[઀-૿]")
+
+
+def script_language(sentence: str) -> str:
+    """"hi" or "gu" for a sentence written mostly in that script, else "en"."""
+    hindi, gujarati = len(_DEVANAGARI.findall(sentence)), len(_GUJARATI.findall(sentence))
+    latin = len(re.findall(r"[A-Za-z]", sentence))
+    if max(hindi, gujarati) == 0 or latin > 2 * max(hindi, gujarati):
+        return "en"
+    return "gu" if gujarati > hindi else "hi"
+
+
+def _gujarati(sentence: str) -> tuple[np.ndarray, int] | None:
+    """The native Gujarati voice (MMS), levelled to Kokoro's loudness and rate;
+    None when it is turned off or unavailable, so Kokoro's Hindi voice reads it."""
+    from voice_pipeline import gujarati_voice
+
+    if not gujarati_voice.wanted():
+        return None
+    try:
+        from scipy.signal import resample_poly
+
+        audio, _ = gujarati_voice.synthesize(sentence)
+        if audio.size == 0:
+            return None
+        audio = resample_poly(audio, 3, 2).astype(np.float32)  # 16 kHz -> Kokoro's 24 kHz
+        peak = float(np.abs(audio).max()) or 1.0
+        return np.clip(audio * min(3.0, 0.7 / peak), -1, 1).astype(np.float32), 24000
+    except Exception:
+        logger.exception("The Gujarati voice failed; using the Hindi voice for this sentence")
+        return None
+
+
+def indic_voice() -> str:
+    """Kokoro's Hindi voice, used for Hindi and (with Gujarati pronunciation) Gujarati."""
+    return os.environ.get("SEBAS_HINDI_VOICE", "").split("#")[0].strip() or "hm_omega"
 
 
 class Mouth:
@@ -112,7 +154,15 @@ class Mouth:
         with self._synth_lock:
             if self._kokoro is None:
                 self._kokoro = _load_kokoro()
-            return self._kokoro.create(sentence, voice=self._voice, speed=1.0, lang=self._lang)
+            language = script_language(sentence)
+            if language == "en":
+                return self._kokoro.create(sentence, voice=self._voice, speed=1.0, lang=self._lang)
+            if language == "gu":
+                native = _gujarati(sentence)
+                if native is not None:
+                    return native
+            # Kokoro's Hindi voice; espeak-ng supplies the Hindi ("hi") or Gujarati ("gu") pronunciation
+            return self._kokoro.create(sentence, voice=indic_voice(), speed=1.0, lang=language)
 
     def _synthesize(self, sentence: str) -> bytes:
         audio, rate = self._create(sentence)
@@ -158,10 +208,15 @@ class Mouth:
             finally:
                 ready.put(None)
 
+        started = time.monotonic()
         threading.Thread(target=produce, daemon=True).start()
         emit("state", state="speaking")
+        first = True
         try:
             while (audio := ready.get()) is not None:
+                if first:
+                    first = False
+                    logger.info("Turn: first words ready to speak after %d ms", (time.monotonic() - started) * 1000)
                 if audio:
                     emit("speech", envelope=loudness_envelope(audio), step=_ENVELOPE_STEP)
                     play_wav(audio)

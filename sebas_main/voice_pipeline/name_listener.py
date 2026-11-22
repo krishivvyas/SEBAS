@@ -25,25 +25,49 @@ logger = logging.getLogger("sebas.voice")
 
 NAME = "sebas"
 # Spellings Whisper produces for "Sebas" that plain similarity would miss.
-_ALIASES = {"sebas", "sebass", "sebaz", "seebas", "sebbas", "sabas", "sebus", "cebas", "sevas"}
+_ALIASES = {"sebas", "sebass", "sebaz", "seebas", "sebbas", "sabas", "sebus", "cebas", "sevas",
+            "sebers", "sebbers", "sebas's",
+            # how the multilingual model writes it in Hindi and Gujarati
+            "सेबास", "सेबस", "सेबाज़", "सेबाज", "सीबास", "सिबास", "सबास", "सेवास",
+            "સેબાસ", "સેબસ", "સીબાસ", "સિબાસ", "સબાસ", "સેવાસ"}
+_SCRIPT_NAMES = ("सेबास", "સેબાસ")
 _FILLERS = {"hey", "hi", "hello", "ok", "okay", "oh", "so", "um", "uh", "yo", "now"}
-SUMMON_WORDS = {"", "rise", "arise", "wake up", "awaken", "are you there"}
+SUMMON_WORDS = {"", "rise", "arise", "wake up", "awaken", "are you there",
+                "utho", "uthiye", "उठो", "उठिए", "उठिये", "ઊઠો", "ઉઠો", "ઊઠો હવે"}
+# What Whisper has made of "rise" in this house ("Sebas, Horizon." in the log).
+_RISE_MISHEARD = {"horizon", "horizons", "raise", "rice", "rise up", "rides", "price", "wise", "rights",
+                  "riza", "nice", "ice", "rays", "arrives", "arise up"}
 
 _RATE = 16000
 _FRAME = 1280  # 80 ms
 _PRE_ROLL_FRAMES = 4  # keep 320 ms before speech starts, so the "S" is not clipped
-_END_SILENCE_FRAMES = 9  # 720 ms of quiet ends an utterance
 _MIN_SPEECH_FRAMES = 4
-_MAX_FRAMES = int(15 * _RATE / _FRAME)
+
+
+def _end_silence_frames() -> int:
+    """Quiet frames that end an utterance (SEBAS_PAUSE_SECONDS, default 1.2 s;
+    it was 0.72 s, which cut people off when they paused to think)."""
+    from voice_pipeline.ears import pause_seconds
+
+    return max(5, round(pause_seconds() * _RATE / _FRAME))
+
+
+def _max_frames() -> int:
+    from voice_pipeline.ears import max_speech_seconds
+
+    return int(max_speech_seconds() * _RATE / _FRAME)
 _NAME_CHECK_SECONDS = 3
 
 
 def _norm(word: str) -> str:
-    return re.sub(r"[^a-z]", "", word.lower())
+    """Letters only, lower case: Latin, Devanagari (Hindi) and Gujarati, with their vowel signs."""
+    return re.sub(r"[^a-zऀ-ॣ०-ॿ઀-ૣ૦-૿]", "", word.lower())
 
 
 def _is_name(candidate: str) -> bool:
-    return candidate in _ALIASES or SequenceMatcher(None, candidate, NAME).ratio() >= 0.8
+    if candidate in _ALIASES or SequenceMatcher(None, candidate, NAME).ratio() >= 0.8:
+        return True
+    return any(SequenceMatcher(None, candidate, name).ratio() >= 0.75 for name in _SCRIPT_NAMES)
 
 
 # What the quick model makes of "Sebas" when it gets it wrong (heard in testing:
@@ -86,8 +110,8 @@ def split_address(text: str) -> str | None:
 
 def is_summon(remainder: str) -> bool:
     """True when the user only called Sebas ("Sebas", "Sebas, rise")."""
-    words = re.sub(r"[^a-z ]", "", remainder.lower()).split()
-    if " ".join(words) in SUMMON_WORDS:
+    words = [w for w in (_norm(w) for w in remainder.split()) if w]
+    if " ".join(words) in SUMMON_WORDS or " ".join(words) in _RISE_MISHEARD:
         return True
     # A single word that sounds like "rise" ("Riza", "rights") is a summon too.
     # Misreading a one-word request this way costs only a "What do you need?".
@@ -143,6 +167,7 @@ class NameListener:
         pre_roll: collections.deque = collections.deque(maxlen=_PRE_ROLL_FRAMES)
         frames: list[np.ndarray] = []
         loud = quiet = 0
+        end_quiet, longest = _end_silence_frames(), _max_frames()
         shown = -1.0  # the mic level the interface last received
         while True:
             if self._push_to_talk.is_set():
@@ -168,7 +193,7 @@ class NameListener:
                 loud, quiet = loud + 1, 0
             else:
                 quiet += 1
-            if quiet >= _END_SILENCE_FRAMES or len(frames) >= _MAX_FRAMES:
+            if quiet >= end_quiet or len(frames) >= longest:
                 if loud >= _MIN_SPEECH_FRAMES:
                     return np.concatenate(frames)
                 pre_roll.clear()

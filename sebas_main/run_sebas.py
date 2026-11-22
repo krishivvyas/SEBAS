@@ -13,6 +13,7 @@ import argparse
 import logging
 import os
 import sys
+import time
 
 from sebas_bootstrap import load_env
 
@@ -116,7 +117,7 @@ def run_voice_turn(listener, ears, mouth, brain, follow_up_seconds: float = 0.0)
         emit("state", state="thinking")
         # The quick model only decides whether Sebas was addressed; the
         # accurate model re-reads the same audio for the request itself.
-        accurate = split_address(ears.transcribe(pcm))
+        accurate = split_address(ears.transcribe(pcm, announce=True))
         text = request_text(accurate if accurate else remainder)
 
     import sebas_calls
@@ -140,11 +141,14 @@ def run_voice_turn(listener, ears, mouth, brain, follow_up_seconds: float = 0.0)
             raise SebasSleep
         if not handle_egg(text, mouth) and not handle_game(text, mouth):
             emit("state", state="thinking")
+            thinking_since = time.monotonic()
             try:
                 reply = brain.ask(text)
             except Exception:
                 logger.exception("The request failed")
                 reply = _FAILURE_REPLY
+            logger.info("Turn: the reply took %d ms (%s)", (time.monotonic() - thinking_since) * 1000,
+                        getattr(getattr(brain, "current", None), "model", "?"))
             print(f"Sebas: {reply}", flush=True)
             emit("transcript", role="sebas", text=reply)
             try:
@@ -199,7 +203,7 @@ def start_calls(ears=None, mouth=None) -> None:
 
 def load_voice():
     """Load the speech models. Returns (listener, ears, mouth)."""
-    from voice_pipeline.ears import Ears
+    from voice_pipeline.ears import Ears, request_model
     from voice_pipeline.mouth import Mouth
     from voice_pipeline.name_listener import NameListener
 
@@ -207,12 +211,33 @@ def load_voice():
     threshold = int(os.environ.get("SEBAS_SILENCE_THRESHOLD") or 500)
     quick_ears = Ears(os.environ.get("SEBAS_NAME_MODEL") or "tiny.en", threshold)
     quick_ears.load()
-    ears = Ears(os.environ.get("SEBAS_WHISPER_MODEL") or "small.en", threshold)
+    ears = Ears(request_model(), threshold)
     ears.load()
     listener = NameListener(quick_ears, threshold, confirm=ears)
     mouth = Mouth(voice=os.environ.get("SEBAS_VOICE") or "bm_george")
     mouth.load()
+    ears.on_language_change = language_notice(mouth)
     return listener, ears, mouth
+
+
+def language_notice(mouth):
+    """"Switching to Hindi, sir": said when the user's language changes, in the
+    new language, before the Hindi/Gujarati model is put to work."""
+    from voice_pipeline.ears import LANGUAGE_NAMES, LANGUAGE_NOTICES
+
+    def notice(language: str) -> None:
+        line = LANGUAGE_NOTICES.get(language)
+        if not line:
+            return
+        logger.info("Conversation language: %s", LANGUAGE_NAMES.get(language, language))
+        emit("transcript", role="sebas", text=line)
+        try:
+            mouth.speak(line)
+        except Exception:
+            logger.exception("Speech output failed")
+        emit("state", state="thinking")
+
+    return notice
 
 
 def follow_up_seconds() -> float:
@@ -311,7 +336,7 @@ def mic_test(seconds: int = 8) -> None:
 
     # What Sebas would make of it: the quick model decides whether he was addressed,
     # the accurate one reads the request (the same two steps as in voice mode).
-    from voice_pipeline.ears import Ears
+    from voice_pipeline.ears import Ears, request_model
     from voice_pipeline.name_listener import request_text, split_address
 
     spoken = audio[rate * 2 :, 0]
@@ -329,7 +354,7 @@ def mic_test(seconds: int = 8) -> None:
 
     threshold = int(float(current or 500))
     quick = Ears(os.environ.get("SEBAS_NAME_MODEL") or "tiny.en", threshold)
-    accurate = Ears(os.environ.get("SEBAS_WHISPER_MODEL") or "small.en", threshold)
+    accurate = Ears(request_model(), threshold)
     opening = spoken[: rate * 3]  # voice mode checks the first 3 seconds for the name
     heard = quick.transcribe(opening)
     address = split_address(heard)

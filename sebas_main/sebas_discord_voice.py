@@ -107,10 +107,10 @@ class VoiceKit:
     def _get_ears(self):
         with self._loading:
             if self._ears is None:
-                from voice_pipeline.ears import Ears
+                from voice_pipeline.ears import Ears, request_model
 
                 threshold = int(float(os.environ.get("SEBAS_SILENCE_THRESHOLD") or 500))
-                self._ears = Ears(os.environ.get("SEBAS_WHISPER_MODEL") or "small.en", threshold)
+                self._ears = Ears(request_model(), threshold)
             return self._ears
 
     def _get_mouth(self):
