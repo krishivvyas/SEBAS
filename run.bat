@@ -26,6 +26,9 @@ rem Coding: "Sebas, have Claude fix the failing test in the sebas project" (a ne
 rem   "how is Claude getting on?"; "stop Claude"; "discard Claude's changes".
 rem Files: "find my DBMS assignment"; "move the PDFs from Downloads to Documents/College"; "undo that"; deleting asks first (Recycle Bin).
 rem Desk: "type this: ..."; "put Chrome on the left and Code on the right"; "close everything except Spotify" (asks first); "press Ctrl+S".
+rem Languages: speak English, Hindi or Gujarati ("Sebas, aaj mera agenda kya hai?" in Hindi or Gujarati script); he answers in the same language
+rem   and says when he switches. Hindi/Gujarati models load only when used and unload after 10 idle minutes.
+rem Calls: "Sebas, take this call" (Ctrl+Alt+C). For callers to hear him: VB-Cable, and disable "CABLE In 16ch" if FxSound is installed.
 rem If DISCORD_BOT_TOKEN is set, the Discord bot starts too (and stops when Sebas closes).
 rem   On Discord: send a voice note in #sebas for a spoken reply; join "Sebas Voice" and he speaks there.
 rem On a call (WhatsApp, Instagram, Meet...): answer it, then "Sebas, take this call" or Ctrl+Alt+C; "step back" to return.

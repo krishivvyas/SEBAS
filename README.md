@@ -31,7 +31,7 @@
 - [Status](#-status)
 - [Version History](#-version-history)
 
-**Current version: v1.11.0**
+**Current version: v1.11.1**
 
 ---
 
@@ -71,8 +71,10 @@ flowchart TD
     subgraph AudioInput["🎙️ Local Acoustic Input"]
         Mic["Microphone (16 kHz)"] --> Gate["Speech segmenter\n(RMS level gate)"]
         Gate --> Name["Name listener\nfaster-whisper tiny.en\n'Does this start with Sebas?'"]
-        Name -- "'Sebas, rise'" --> Greet["'At your service.' + chime"] --> STT["faster-whisper small.en\n(next utterance)"]
-        Name -- "'Sebas, <request>'" --> STT2["faster-whisper small.en\n(same audio, re-read accurately)"]
+        Name -- "'Sebas, rise'" --> Greet["'At your service.' + chime"] --> Lang["Language check\ntiny (en / hi / gu)"]
+        Name -- "'Sebas, <request>'" --> Lang
+        Lang -- "English" --> STT["faster-whisper small.en"]
+        Lang -- "Hindi / Gujarati\n(+ 'switching language')" --> STT2["faster-whisper small\n(loaded only when needed)"]
     end
 
     subgraph Intelligence["🧠 Cognitive Engine"]
@@ -85,7 +87,7 @@ flowchart TD
 
     subgraph AudioOutput["🔊 Local Acoustic Output"]
         Brain --> TextFormatter["Speech cleaner\n(Markdown / link stripper)"]
-        TextFormatter --> TTS["Kokoro TTS (CPU)\nbm_george"]
+        TextFormatter --> TTS["Per sentence, by script:\nKokoro bm_george (English)\nKokoro hm_omega (Hindi)\nMMS Gujarati (Gujarati)"]
         TTS -- "Sentence pipeline" --> Speakers["Speakers"]
     end
 
@@ -535,9 +537,10 @@ Works with WhatsApp Desktop, Instagram or Meet in the browser, Discord, and phon
 </details>
 
 <details>
-<summary><b>Light on the laptop</b>: about 760 MB of RAM</summary>
+<summary><b>Light on the laptop</b>: about 850 MB of RAM in English</summary>
 
-- About **760 MB of RAM** with voice loaded (down from ~1.6 GB) and ~0% CPU at rest.
+- About **850 MB of RAM** with voice loaded in English (760 MB before the language detector was added in v1.11.0; ~1.6 GB before the ONNX voice) and ~0% CPU at rest.
+- Hindi and Gujarati add about **330 MB** (their speech model) and the Gujarati voice about 120 MB, **only while in use**: both are released after 10 minutes without them.
 - ONNX Kokoro (fp16, ~205 MB instead of ~1.1 GB on PyTorch, loading in 2 s).
 - A stray PyTorch import in OpenJarvis's storage package is avoided.
 - OpenJarvis telemetry and trace logging are off.
@@ -632,9 +635,11 @@ sebas/
     │   ├── config.toml              # Model, persona, enabled tools
     │   └── laptop.toml              # Allowlist of apps, sites, projects, routines
     ├── voice_pipeline/
-    │   ├── name_listener.py         # Wakes on "Sebas"
-    │   ├── ears.py                  # faster-whisper speech recognition
-    │   └── mouth.py                 # Kokoro speech and sentence streaming
+    │   ├── name_listener.py         # Wakes on "Sebas" (in Latin, Devanagari or Gujarati script)
+    │   ├── ears.py                  # faster-whisper: language check, English / Hindi / Gujarati
+    │   ├── mouth.py                 # Kokoro speech, a voice per sentence by script, sentence streaming
+    │   ├── gujarati_voice.py        # Meta's MMS Gujarati voice (ONNX), loaded only when needed
+    │   └── call_audio.py            # Hearing callers, and the VB-Cable route for clean mode
     └── custom_tools/
         ├── devops_manager.py        # Vercel, AWS EC2
         ├── github_assistant.py      # PRs, notifications
@@ -840,11 +845,12 @@ Or type in the Service Bell, click a quick action, or ring the bell and just spe
 
 - **API check** (one request): `.venv\Scripts\python.exe sebas_bootstrap.py`
 - **Logs:** warnings and Sebas's own activity are kept in `~/.openjarvis/sebas/logs/sebas.log` (three rotating files of 1 MB), so you can look after the window has closed.
-- **Offline tests:** `run.bat --selftest` runs 184 tests in about 30 seconds.
+- **Offline tests:** `run.bat --selftest` runs 213 tests in about 30 seconds.
 
 <details>
-<summary><b>What the 184 offline tests cover</b></summary>
+<summary><b>What the 213 offline tests cover</b></summary>
 
+- **Languages:** only English, Hindi and Gujarati are chosen (Urdu or Marathi become Hindi); the Hindi/Gujarati model is loaded only when one of them is heard, announced once per switch (never for a caller), and released when idle; Gujarati written in Devanagari is turned into Gujarati script; "Sebas" in three scripts; misheard "rise"; each sentence voiced by its script, with the Hindi voice as fallback for Gujarati; Hindi and Gujarati yes and no; the pause and length settings.
 - **Screen-time diary:** site names, never page titles; limits said once.
 - **"What did I do today?"**, the bedtime window (including bedtimes after midnight) and its once-then-once-more rule.
 - **Search** over notes, Word files, journal and flashcards, with code projects skipped.
@@ -932,15 +938,19 @@ The model, persona and enabled tools live in [`sebas_main/configs/sebas/config.t
 - **Browser hands:** the extension in a test Edge 157 profile against a small local website (it connected in a second, read pages, searched, followed links, pressed an in-page button, refused a `file:` address, noticed its tab being closed, and reconnected 23 seconds after Sebas restarted). Real Gemini drove the loop over those recorded pages: it found a price in three requests, ignored an instruction planted in the page, and stopped for a yes before posting a review.
 - **Errands** with a real Gemini key (a four-step plan, and a three-step plan with one judgment step, both planned by Gemini from a spoken-style request) and with the real local `qwen2.5` (two judgment steps answered correctly in 63 seconds including loading the model, with 3 GB of RAM free).
 - **File hands** on a scratch folder in the real Downloads: move, rename, undo, zip, and a delete to the real Recycle Bin.
+- **Voice, day to day:** waking on "Sebas" and spoken requests with the real microphone (the log's misheard "rise"s led to the v1.11.0 fixes).
+- **Calls, clean mode:** with VB-Cable, after disabling *CABLE In 16ch* and quitting FxSound (22 Nov): the test tone reached CABLE Output (level 0.12) and a call was handled.
+- **Languages (v1.11.0)**, with synthetic speech (Kokoro English and Hindi voices, MMS Gujarati voice) through the real models on this laptop, its CPU about half busy: all six test sentences were detected as the right language; English in about 3.3 s, Hindi and Gujarati in 3.8–6 s (8.6 s for the first, which loads the model); the Hindi/Gujarati model loaded only on the first Hindi sentence (+330 MB) and was released when idle (941 → 631 MB). `large-v3-turbo` was measured at 15–19 s and `medium` at 12 s a sentence, so they were not used.
 - **Desk hands:** dictation in a test text box (328 characters with ₹, accents, an emoji and a line break arrived intact); snapping and closing on real windows.
 </details>
 
 <details>
 <summary><b>⏳ Not yet tested</b></summary>
 
-- A real microphone and voice; real Vercel, AWS and Steam accounts; the Google sign-in.
+- **Hindi and Gujarati with a real microphone:** only with synthetic speech so far (see Tested live).
+- Real Vercel, AWS and Steam accounts; the Google sign-in.
 - **Vercel watcher:** only against a stand-in (no Vercel token here yet).
-- **Coding delegate:** the Antigravity fallback has not been run live (its launch command resolves, but no task has been handed to its agent); the delegate has not yet been asked for through Gemini or by voice.
+- **Coding delegate:** the Antigravity fallback has not been run live (its launch command resolves, but no task has been handed to its agent); it was asked for live once (17 Nov: its own branch, a one-line change, discarded afterwards), but its finish report has not been heard by voice.
 - **Your day:** the bedtime words and a limit being passed have not been heard live; search has only been run on this laptop's small Documents folder; no real pull request has been reviewed (there was none open).
 - **Messages:** no real message has been sent on any channel. WhatsApp Desktop itself, the Gmail compose window and posting to a Discord channel are untested live.
 - **Browser hands:** the extension loaded by hand in the everyday browser, reconnection after the browser itself restarts, real websites, the local model choosing actions, and the fix that makes the extension's own refusals (a password field, a vanished element) reach Sebas.
@@ -969,7 +979,8 @@ Every commit gets a version, and each version is tagged in git (`git checkout v1
 
 | Version | Date | Commit | What changed |
 |---|---|---|---|
-| **v1.11.0** | 2026-11-22 | *next* | **English, Hindi and Gujarati**: language detected per sentence (tiny, then small for Hindi/Gujarati, loaded only when needed and released after 10 idle minutes), replies in your language, Sebas says when he switches; Hindi voice (Kokoro `hm_omega`) and a native Gujarati voice (MMS); Hindi/Gujarati yes and no. **Listening fixes**: 1.2 s pause allowed, 25 s requests, misheard "rise" understood, contacts/projects in the vocabulary, timing in the log |
+| v1.11.1 | 2026-11-22 | *next* | Documentation brought up to date: architecture diagram, RAM figures, the 213 tests, live test results (calls clean mode, languages), folder layout, `run.bat` notes |
+| **v1.11.0** | 2026-11-22 | `f3315e5` | **English, Hindi and Gujarati**: language detected per sentence (tiny, then small for Hindi/Gujarati, loaded only when needed and released after 10 idle minutes), replies in your language, Sebas says when he switches; Hindi voice (Kokoro `hm_omega`) and a native Gujarati voice (MMS); Hindi/Gujarati yes and no. **Listening fixes**: 1.2 s pause allowed, 25 s requests, misheard "rise" understood, contacts/projects in the vocabulary, timing in the log |
 | v1.10.4 | 2026-11-22 | `72eda40` | Interface: the Calls panel keeps its text and buttons inside the frame (wraps instead of cutting off); the Ear (microphone) meter moved up under the Battery/Engine/Memory gauges and glows while Sebas listens; README: troubleshooting for calls stuck in speaker mode (VB-Cable "CABLE In 16ch" and FxSound) |
 | v1.10.3 | 2026-11-19 | `a6fb0fe` | The missing `LICENSE` file added (MIT for Sebas; OpenJarvis in `sebas_main/` stays Apache 2.0) |
 | v1.10.2 | 2026-11-19 | `7415971` | README reformatted for reading (collapsible sections, tables, contents list); version history added here and in FEATURES.md |

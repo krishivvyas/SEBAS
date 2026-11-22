@@ -18,7 +18,7 @@ Any request you speak goes through 🧠, except the ones in [Answered on the lap
 
 | Feature | Say | Model |
 |---|---|---|
-| Wake on his name | *"Sebas, rise."* or *"Sebas, open YouTube."* | ⚙️ (local Whisper) |
+| Wake on his name | *"Sebas, rise."*, *"सेबास, उठो"*, or *"Sebas, open YouTube."* | ⚙️ (local Whisper) |
 | Follow-up without "Sebas" | Speak within 8 s of the chime | ⚙️ |
 | Ring the bell / type a request | Service Bell at the bottom of the window | 🧠 |
 | Go to sleep | *"Sebas, sleep"*, *"good night"*, *"that will be all"* | ⚙️ |
@@ -179,10 +179,11 @@ These are recognised on the laptop and answered instantly, with no Gemini reques
 
 ## Which version added what
 
-Current version: **v1.11.0**. The full history, with commits, is in the [README](README.md#️-version-history).
+Current version: **v1.11.1**. The full history, with commits, is in the [README](README.md#️-version-history).
 
 | Version | Features added |
 |---|---|
+| v1.11.1 | Documentation brought up to date |
 | v1.11.0 | English, Hindi and Gujarati (detected per sentence, replies and voices in each, models loaded only when used); listening fixes (longer pauses, misheard "rise", timing in the log) |
 | v1.10.4 | Calls panel layout fixed; Ear meter moved under the gauges; speaker-mode troubleshooting in the README |
 | v1.10.3 | LICENSE file (MIT) |
