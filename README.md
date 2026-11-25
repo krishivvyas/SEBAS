@@ -56,7 +56,7 @@ An Edwardian butler's study inside a holographic HUD: brass and ink-navy with ho
 |---|---|
 | **The Ledger** (left) | The conversation, plus notices such as switching to the local model |
 | **The Household** (right) | Brass dial gauges for battery, CPU and memory; the Agenda (overdue in red); Accounts (spent today and this month); reminders; remembered facts; which mind is in use; a live microphone meter |
-| **The Service Bell** (bottom) | Type a request, click a quick action (briefing, workspace, deployments, GitHub, status), or ring the bell to talk without saying "Sebas" |
+| **The Service Bell** (bottom) | Type a request, click a quick action (briefing, workspace, deployments, GitHub, status), or ring the bell to talk without saying "Sebas". The 🎙 button beside the bell mutes the microphone (Sebas hears nothing, not even his name, until you click it again; typing still works) |
 | **Activity ticker** | Lines like *"Consulting the GitHub ledger…"* while tools run |
 | **Extras** | Boot sequence with the crest; synthesised UI sounds (♪ toggles them); ambient dust, scanlines and film grain (✦ toggles them) |
 

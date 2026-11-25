@@ -268,6 +268,9 @@ class Api:
     def push_to_talk(self) -> bool:
         return self._app.push_to_talk()
 
+    def set_muted(self, on: bool) -> bool:
+        return self._app.set_muted(on)
+
     def say(self, line: str) -> None:
         """A scripted game line: spoken in Sebas's voice, no Gemini involved."""
         mouth = self._app.mouth

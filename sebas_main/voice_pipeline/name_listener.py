@@ -145,6 +145,23 @@ def request_text(remainder: str) -> str:
     return re.sub(r"^a?rise\b[,.!]?\s*(and\s+)?", "", remainder, flags=re.IGNORECASE).strip()
 
 
+_MUTED = threading.Event()
+
+
+def set_muted(on: bool) -> None:
+    """Mute or unmute the microphone: while muted, Sebas hears nothing, not even his name."""
+    if on == _MUTED.is_set():
+        return
+    _MUTED.set() if on else _MUTED.clear()
+    logger.info("Microphone %s", "muted" if on else "unmuted")
+    emit("muted", on=on)
+    emit("mic", level=0.0)
+
+
+def is_muted() -> bool:
+    return _MUTED.is_set()
+
+
 class PushToTalk(Exception):
     """Raised inside the listener when the UI's bell button is pressed."""
 
@@ -173,7 +190,11 @@ class NameListener:
             if self._push_to_talk.is_set():
                 self._push_to_talk.clear()
                 raise PushToTalk
-            frame, _ = stream.read(_FRAME)
+            frame, _ = stream.read(_FRAME)  # read even when muted, so the stream never backs up
+            if _MUTED.is_set():
+                pre_roll.clear()
+                frames, loud, quiet, shown = [], 0, 0, 0.0
+                continue
             frame = frame[:, 0].copy()
             rms = float(np.sqrt(np.mean(frame.astype(np.float64) ** 2)))
             # In tenths, and only when it changes: silence costs the interface nothing

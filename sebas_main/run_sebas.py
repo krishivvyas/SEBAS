@@ -97,11 +97,13 @@ def run_voice_turn(listener, ears, mouth, brain, follow_up_seconds: float = 0.0)
     is handled directly. With ``follow_up_seconds`` above zero, Sebas keeps
     listening after each reply, so follow-ups need no "Sebas".
     """
-    from voice_pipeline.name_listener import is_sleep_request, is_summon, request_text, split_address
+    from voice_pipeline.name_listener import is_muted, is_sleep_request, is_summon, request_text, split_address
 
     print('Listening for "Sebas"...', flush=True)
     emit("state", state="idle")
     pcm, remainder = listener.wait()
+    if pcm is None and is_muted():  # a scheduled "listen for the answer" while the mic is muted
+        return
     if pcm is None:  # the UI's bell: go straight to listening
         mouth.chime()
         emit("state", state="listening")
@@ -155,7 +157,7 @@ def run_voice_turn(listener, ears, mouth, brain, follow_up_seconds: float = 0.0)
                 mouth.speak(reply)
             except Exception:
                 logger.exception("Speech output failed")
-        if follow_up_seconds <= 0:
+        if follow_up_seconds <= 0 or is_muted():
             break
         mouth.chime()  # still listening
         emit("state", state="listening")

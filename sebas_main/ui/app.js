@@ -164,10 +164,18 @@ const live = { state: "idle", mic: 0, micShown: 0, envelope: [], envStart: 0, en
 function setState(state) {
   if (!STATE_TEXT[state] || state === live.state) return;
   const prev = live.state; live.state = state; document.body.dataset.state = state;
-  const [cap, hint] = STATE_TEXT[state]; $("#caption").textContent = cap; $("#hint").textContent = hint; $("#state-label").textContent = cap;
+  const [cap, hint] = STATE_TEXT[state]; $("#caption").textContent = cap; $("#state-label").textContent = cap;
+  $("#hint").textContent = document.body.classList.contains("muted") ? "Microphone muted. Type below, or unmute." : hint;
   if (state === "listening") Sound.chime(true);
   else if (state === "thinking") { Sound.tick(); live.thinkStart = performance.now(); }
   else if (state === "idle" && prev === "speaking") Sound.chime(false);
+}
+function setMuted(on) {
+  on = !!on; document.body.classList.toggle("muted", on);
+  const b = $("#mute"); b.classList.toggle("on", on); b.setAttribute("aria-pressed", on);
+  b.title = on ? "Unmute the microphone" : "Mute the microphone";
+  $("#hint").textContent = on ? "Microphone muted. Type below, or unmute." : STATE_TEXT[live.state][1];
+  if (on) live.mic = 0;
 }
 function currentAmp(now) {
   if (live.state !== "speaking" || !live.envelope.length) return 0;
@@ -345,7 +353,8 @@ function applySnapshot(s) {
   lastSnapshot = s;
   showErrand(s.errand);
   if (s.mode) setMode(s.mode, s.model);
-  $("#tel-voice").textContent = s.voice ? "ON" : "OFF";
+  $("#tel-voice").textContent = !s.voice ? "OFF" : s.muted ? "MUTED" : "ON";
+  if ("muted" in s) setMuted(s.muted);
   fillList("#reminders", s.reminders || [], "No engagements pending.", (r) => {
     const li = document.createElement("li"); li.append(r.text); const w = document.createElement("span"); w.className = "when"; w.textContent = relTime(r.due); li.appendChild(w); return li;
   });
@@ -382,6 +391,7 @@ window.Sebas = {
         break;
       case "tool": toolEvent(evt); break;
       case "mic": live.mic = evt.level; break;
+      case "muted": setMuted(evt.on); break;
       case "speech": live.envelope = evt.envelope || []; live.envStep = evt.step || 0.04; live.envStart = performance.now(); break;
       case "mode": setMode(evt.mode, evt.model); break;
       case "notice": addEntry("notice", evt.text); break;
@@ -427,6 +437,10 @@ function wireControls() {
   $("#bell").addEventListener("click", async () => {
     const bell = $("#bell"); bell.classList.remove("ring"); void bell.offsetWidth; bell.classList.add("ring"); Sound.bell();
     if (api()) await api().push_to_talk(); else setState("listening");
+  });
+  $("#mute").addEventListener("click", async () => {
+    const want = !document.body.classList.contains("muted"); Sound.tick();
+    if (api()) setMuted(await api().set_muted(want)); else setMuted(want);
   });
   $("#btn-min").addEventListener("click", () => api() && api().minimize());
   $("#btn-close").addEventListener("click", () => (api() ? api().close() : window.close()));

@@ -21,6 +21,7 @@ Any request you speak goes through 🧠, except the ones in [Answered on the lap
 | Wake on his name | *"Sebas, rise."*, *"सेबास, उठो"*, or *"Sebas, open YouTube."* | ⚙️ (local Whisper) |
 | Follow-up without "Sebas" | Speak within 8 s of the chime | ⚙️ |
 | Ring the bell / type a request | Service Bell at the bottom of the window | 🧠 |
+| Mute / unmute the microphone | 🎙 button beside the bell | 🧠 |
 | Go to sleep | *"Sebas, sleep"*, *"good night"*, *"that will be all"* | ⚙️ |
 | Long-term memory | *"Remember that I prefer metric units"*, *"forget that"* | 🧠 |
 | Web search | *"Who won the last F1 race?"* | 🧠 |
